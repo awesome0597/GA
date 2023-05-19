@@ -61,7 +61,7 @@ class GeneticAlgorithm:
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
         self.elitism_rate = elitism_rate
-        self.encryption_code, self.letter_freq = self.load_encryption_code()
+        self.encryption_code, self.letter_freq, self.two_letter_freq = self.load_encryption_code()
         self.single_letter_words = list(set(word for word in self.encryption_code.split() if len(word) == 1))
         if len(self.single_letter_words) > 2:
             print("Error: More than 3 single letter words in encryption code")
@@ -91,8 +91,23 @@ class GeneticAlgorithm:
             total_letters = sum(letter_freq.values())
             for letter in letter_freq:
                 letter_freq[letter] /= total_letters
-            print()
-        return encryption_code, letter_freq
+
+            # calculate two letter frequencies
+            encryption_code_length = len(encryption_code)
+            two_letter_freq = {}
+            for i in range(encryption_code_length - 1):
+                if encryption_code[i] == ' ' or encryption_code[i + 1] == ' ':  # Exclude space character
+                    continue
+                pair = encryption_code[i] + encryption_code[i + 1]  # Get pair of letters
+                if pair in two_letter_freq:
+                    two_letter_freq[pair] += 1
+                else:
+                    two_letter_freq[pair] = 1
+            # Normalize two letter frequencies
+
+
+
+        return encryption_code, letter_freq, two_letter_freq
 
     def _create_population(self):
         population = []
@@ -148,11 +163,9 @@ class GeneticAlgorithm:
         encryption_code = self.encryption_code
         encryption_code_length = len(encryption_code)
 
-        if individual[self.single_letter_words[0]] in {"A", "I"} or individual[self.single_letter_words[1]] in {"A",
-                                                                                                                "I"}:
+        if individual[self.single_letter_words[0]] in {"A", "I"} or individual[self.single_letter_words[1]] in {"A",                                                                                                 "I"}:
             fitness += 100
-        if individual[self.single_letter_words[0]] in {"A", "I"} and individual[self.single_letter_words[1]] in {"A",
-                                                                                                                 "I"}:
+        if individual[self.single_letter_words[0]] in {"A", "I"} and individual[self.single_letter_words[1]] in {"A",                                                                                                    "I"}:
             fitness += 100
 
         for word in encryption_code.split():
@@ -163,19 +176,20 @@ class GeneticAlgorithm:
             if decrypted_word.lower() in COMMON_WORDS:
                 fitness += 1
 
-        two_letter_freq = {}
-        for i in range(encryption_code_length - 1):
-            if encryption_code[i] == ' ' or encryption_code[i + 1] == ' ':  # Exclude space character
-                continue
-            pair = individual[encryption_code[i]] + individual[encryption_code[i + 1]]  # Get pair of letters
-            if pair in two_letter_freq:
-                two_letter_freq[pair] += 1
-            else:
-                two_letter_freq[pair] = 1
+        # two_letter_freq = {}
+        # for i in range(encryption_code_length - 1):
+        #     if encryption_code[i] == ' ' or encryption_code[i + 1] == ' ':  # Exclude space character
+        #         continue
+        #     pair = individual[encryption_code[i]] + individual[encryption_code[i + 1]]  # Get pair of letters
+        #     if pair in two_letter_freq:
+        #         two_letter_freq[pair] += 1
+        #     else:
+        #         two_letter_freq[pair] = 1
 
-        for pair in two_letter_freq:
-            pair_freq_value = two_letter_freq[pair]
-            fitness -= abs(TWO_LETTER_FREQ[pair] * encryption_code_length - pair_freq_value)
+        for pair in self.two_letter_freq:
+            real_pair = individual[pair[0]] + individual[pair[1]]
+            pair_freq_value = self.two_letter_freq[pair]
+            fitness -= abs(TWO_LETTER_FREQ[real_pair] * encryption_code_length - pair_freq_value)
 
         for key in self.letter_freq:
             fitness -= abs(LETTER_FREQ[individual[key]] - self.letter_freq[key])
@@ -185,13 +199,34 @@ class GeneticAlgorithm:
         # calculate fitness for each individual
         for individual_dict in self.population:
             individual_dict['fitness'] = self._compute_fitness(individual_dict)
+        self.population = sorted(self.population, key=lambda x: x['fitness'], reverse=True)
         # evolve the population according to the fitness
-        bar = tqdm(total=generations, desc='Generations')
-        for generation in range(1, generations + 1):
+        target_fitness = -900  # The fitness value to track progress towards
+
+        initial_fitness = self.population[0]['fitness']
+        generations = 0
+        local_minima = 0
+        fitness = self.population[0]['fitness']
+
+        while self.population[0]['fitness'] < target_fitness:
             self.evolve()
-            bar.update(1)
-        bar.close()
+            current_fitness = self.population[0]['fitness']
+            if current_fitness == fitness:
+                local_minima += 1
+            else:
+                local_minima = 0
+            fitness = current_fitness
+            if local_minima > 100:
+                break
+            print(self.population[0]['fitness'])
+            generations += 1
+
+        # for generation in range(1, generations + 1):
+        #     self.evolve()
+        #     bar.update(1)
+        # bar.close()
         # decrypt the code using the best individual
+        print(generations)
         self.decrypt()
 
     def decrypt(self):
@@ -222,7 +257,7 @@ def main():
     # load encryption code
     algorithm = GeneticAlgorithm(population_size=1000, selection_rate=0.3, mutation_rate=0.05)
     # run algorithm
-    algorithm.run(100)
+    algorithm.run(200)
 
 
 if __name__ == "__main__":
