@@ -2,7 +2,7 @@ import random
 import sys
 import string
 import time
-
+import re
 from tqdm import tqdm
 
 
@@ -33,6 +33,8 @@ def load_two_letter_frequencies():
 def load_encryption_code():
     with open('enc.txt', 'r') as f:
         encryption_code = f.read().replace('\n', ' ').upper()
+        # ignore words with periods in them
+        encryption_code = re.sub(r'\b\w+\.\w+\b', '', encryption_code)
     return encryption_code
 
 
@@ -48,16 +50,14 @@ def crossover(parent1, parent2):
 
 
 class GeneticAlgorithm:
-    def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, elitism_rate=0.1,
-                 diversification_rate=0.01):
+    def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, elitism_rate=0.1):
         self.population_size = population_size
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
         self.elitism_rate = elitism_rate
-        self.diversification_rate = diversification_rate
         self.encryption_code = load_encryption_code()
         self.single_letter_words = set(word for word in self.encryption_code.split() if len(word) == 1)
-        if len(self.single_letter_words) > 3:
+        if len(self.single_letter_words) > 2:
             print("Error: More than 3 single letter words in encryption code")
             sys.exit(1)
         self.common_words = load_common_words()
@@ -113,8 +113,8 @@ class GeneticAlgorithm:
         self.population = []
         self.population.extend(elites)
         self.population.extend(children)
-
-        # Remove the least fittest individuals to maintain population size
+        # TODO: check children vs least fit individuals
+        # Remove the least fit individuals to maintain population size
         self.population = sorted(self.population, key=lambda x: float(x['fitness']), reverse=True)[
                           :self.population_size]
 
