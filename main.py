@@ -38,6 +38,16 @@ def crossover(parent1, parent2):
         child[keys[i]] = parent1[keys[i]]
     for i in range(crossover_point, len(keys)):
         child[keys[i]] = parent2[keys[i]]
+    # Check for duplicate values
+    values = set(child.values())
+    while len(values) != len(keys):
+        unused_letters = list(set(string.ascii_uppercase) - set(child.values()))
+        for key, value in child.items():
+            if list(child.values()).count(value) > 1:
+                new_value = random.choice(unused_letters)
+                child[key] = new_value
+                unused_letters.remove(new_value)
+        values = set(child.values())
     return child
 
 
@@ -68,7 +78,8 @@ class GeneticAlgorithm:
             encryption_code = encryption_code.replace('.', ' ')
             encryption_code = encryption_code.replace(';', ' ')
             # remove all single letter words that are not in single_letter_words
-            encryption_code = ' '.join(word for word in encryption_code.split() if len(word) > 1 or word in self.single_letter_words)
+            encryption_code = ' '.join(
+                word for word in encryption_code.split() if len(word) > 1 or word in self.single_letter_words)
         return encryption_code
 
     def _create_population(self):
@@ -120,7 +131,6 @@ class GeneticAlgorithm:
         self.population = sorted(self.population, key=lambda x: float(x['fitness']), reverse=True)[
                           :self.population_size]
         self.population = self.population[:-len(children)]
-
 
     def _compute_fitness(self, individual):
         fitness = 0
