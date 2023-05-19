@@ -30,14 +30,6 @@ def load_two_letter_frequencies():
     return two_letter_freq
 
 
-def load_encryption_code():
-    with open('enc.txt', 'r') as f:
-        encryption_code = f.read().replace('\n', ' ').upper()
-        # ignore words with periods in them
-        encryption_code = re.sub(r'\b\w+\.\w+\b', '', encryption_code)
-    return encryption_code
-
-
 def crossover(parent1, parent2):
     child = {}
     keys = list(parent1.keys())
@@ -55,15 +47,29 @@ class GeneticAlgorithm:
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
         self.elitism_rate = elitism_rate
-        self.encryption_code = load_encryption_code()
+        self.encryption_code = self.load_encryption_code()
         self.single_letter_words = set(word for word in self.encryption_code.split() if len(word) == 1)
         if len(self.single_letter_words) > 2:
+            print(self.single_letter_words)
             print("Error: More than 3 single letter words in encryption code")
             sys.exit(1)
         self.common_words = load_common_words()
         self.letter_freq = load_letter_frequencies()
         self.two_letter_freq = load_two_letter_frequencies()
         self.population = self._create_population()
+
+    def load_encryption_code(self):
+        with open('enc.txt', 'r') as f:
+            self.single_letter_words = set(word.upper() for word in f.read().split() if len(word) == 1)
+            f.seek(0)
+            # replace all commas and periods with spaces
+            encryption_code = f.read().replace('\n', ' ').upper()
+            encryption_code = encryption_code.replace(',', ' ')
+            encryption_code = encryption_code.replace('.', ' ')
+            encryption_code = encryption_code.replace(';', ' ')
+            # remove all single letter words that are not in single_letter_words
+            encryption_code = ' '.join(word for word in encryption_code.split() if len(word) > 1 or word in self.single_letter_words)
+        return encryption_code
 
     def _create_population(self):
         population = []
@@ -122,50 +128,44 @@ class GeneticAlgorithm:
         for individual in self.population:
             self._evaluate_fitness(individual)
 
-    def _compute_fitness(self, key):
+    def _compute_fitness(self, individual):
         fitness = 0
 
-        if key["A"] in self.single_letter_words or key["I"] in self.single_letter_words:
+        if individual["A"] in self.single_letter_words or individual["I"] in self.single_letter_words:
             fitness += 5.25
-        if key["A"] in self.single_letter_words and key["I"] in self.single_letter_words:
+        if individual["A"] in self.single_letter_words and individual["I"] in self.single_letter_words:
             fitness += 5.25
 
         for word in self.encryption_code.split():
             decrypted_word = ""
             for letter in word:
-                if letter in key:
-                    decrypted_word += key[letter]
-                else:
-                    decrypted_word += letter
-
+                decrypted_word += individual[letter]
             if decrypted_word in self.common_words:
                 fitness += 1
 
         letter_freq = {}
         for letter in self.encryption_code:
-            if letter in string.ascii_uppercase:
-                if letter in letter_freq:
-                    letter_freq[letter] += 1
-                else:
-                    letter_freq[letter] = 1
+            if letter in letter_freq:
+                letter_freq[letter] += 1
+            else:
+                letter_freq[letter] = 1
 
         for letter in letter_freq:
             if letter != ' ':  # Exclude space character
-                letter_freq[letter] /= len(self.encryption_code)
-                # check percentage difference between letter frequency in encryption code and in english
+                fitness -= abs(self.letter_freq[letter] * 1000 - letter_freq[letter])
 
         two_letter_freq = {}
         for i in range(len(self.encryption_code) - 1):
+            if self.encryption_code[i] == ' ' or self.encryption_code[i + 1] == ' ':  # Exclude space character
+                continue
             pair = self.encryption_code[i] + self.encryption_code[i + 1]
-            if pair[0] in string.ascii_uppercase and pair[1] in string.ascii_uppercase:
-                if pair in two_letter_freq:
-                    two_letter_freq[pair] += 1
-                else:
-                    two_letter_freq[pair] = 1
+            if pair in two_letter_freq:
+                two_letter_freq[pair] += 1
+            else:
+                two_letter_freq[pair] = 1
 
         for pair in two_letter_freq:
-            two_letter_freq[pair] /= len(self.encryption_code)
-            fitness -= abs(two_letter_freq[pair] - self.two_letter_freq[pair])
+            fitness -= abs(self.two_letter_freq[pair] * 1000 - two_letter_freq[pair])
 
         return fitness
 
