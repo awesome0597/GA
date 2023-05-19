@@ -1,8 +1,9 @@
 import random
 import sys
 import string
+import time
+
 from tqdm import tqdm
-import multiprocessing as mp
 
 
 def load_common_words():
@@ -47,8 +48,8 @@ def crossover(parent1, parent2):
 
 
 class GeneticAlgorithm:
-    def _init_(self, population_size=1000, selection_rate=0.3, mutation_rate=0.05, elitism_rate=0.1,
-               diversification_rate=0.01):
+    def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, elitism_rate=0.1,
+                 diversification_rate=0.01):
         self.population_size = population_size
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
@@ -151,7 +152,7 @@ class GeneticAlgorithm:
         for letter in letter_freq:
             if letter != ' ':  # Exclude space character
                 letter_freq[letter] /= len(self.encryption_code)
-                fitness -= abs(letter_freq[letter] - self.letter_freq[letter])
+                # check percentage difference between letter frequency in encryption code and in english
 
         two_letter_freq = {}
         for i in range(len(self.encryption_code) - 1):
@@ -173,16 +174,15 @@ class GeneticAlgorithm:
 
     def run(self, generations=50):
         bar = tqdm(total=generations, desc='Generations')
-
+        start_time = time.time()
         # calculate fitness for each individual
         for individual_dict in self.population:
             individual_dict['fitness'] = self._compute_fitness(individual_dict)
-
+        end_time = time.time()
+        print("Initial population fitness calculated in {} seconds".format(end_time - start_time))
         # evolve the population according to the fitness
         for generation in range(1, generations + 1):
             self.evolve(generation)
-            population_sum = sum(individual_dict['fitness'] for individual_dict in self.population)
-            print("Generation {} population fitness: {}".format(generation, population_sum))
             bar.update(1)
 
         bar.close()
@@ -195,5 +195,5 @@ def main():
     print(algorithm.population[0])
 
 
-if __name__ == "_main_":
+if __name__ == "__main__":
     exit(main())
