@@ -150,10 +150,10 @@ class GeneticAlgorithm:
 
         if individual[self.single_letter_words[0]] in {"A", "I"} or individual[self.single_letter_words[1]] in {"A",
                                                                                                                 "I"}:
-            fitness += 20
+            fitness += 100
         if individual[self.single_letter_words[0]] in {"A", "I"} and individual[self.single_letter_words[1]] in {"A",
                                                                                                                  "I"}:
-            fitness += 20
+            fitness += 100
 
         for word in encryption_code.split():
             decrypted_word = []
