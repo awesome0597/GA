@@ -63,7 +63,6 @@ class GeneticAlgorithm:
         self.elitism_rate = elitism_rate
         self.encryption_code = self.load_encryption_code()
         self.single_letter_words = list(set(word for word in self.encryption_code.split() if len(word) == 1))
-        print(self.single_letter_words)
         if len(self.single_letter_words) > 2:
             print("Error: More than 3 single letter words in encryption code")
             sys.exit(1)
@@ -136,9 +135,11 @@ class GeneticAlgorithm:
         encryption_code_length = len(encryption_code)
         population_length = len(self.population)
 
-        if individual[self.single_letter_words[0]] in {"A","I"} or individual[self.single_letter_words[1]] in {"A","I"}:
+        if individual[self.single_letter_words[0]] in {"A", "I"} or individual[self.single_letter_words[1]] in {"A",
+                                                                                                                "I"}:
             fitness += 5.25
-        if individual[self.single_letter_words[0]] in {"A","I"} and individual[self.single_letter_words[1]] in {"A","I"}:
+        if individual[self.single_letter_words[0]] in {"A", "I"} and individual[self.single_letter_words[1]] in {"A",
+                                                                                                                 "I"}:
             fitness += 5.25
 
         for word in encryption_code.split():
@@ -146,7 +147,7 @@ class GeneticAlgorithm:
             for letter in word:
                 decrypted_word.append(individual[letter])
             decrypted_word = ''.join(decrypted_word)
-            if decrypted_word in COMMON_WORDS:
+            if decrypted_word.lower() in COMMON_WORDS:
                 fitness += 1
 
         letter_freq = {}
@@ -165,7 +166,7 @@ class GeneticAlgorithm:
         for i in range(encryption_code_length - 1):
             if encryption_code[i] == ' ' or encryption_code[i + 1] == ' ':  # Exclude space character
                 continue
-            pair = individual[encryption_code[i]] + individual[encryption_code[i + 1]] # Get pair of letters
+            pair = individual[encryption_code[i]] + individual[encryption_code[i + 1]]  # Get pair of letters
             if pair in two_letter_freq:
                 two_letter_freq[pair] += 1
             else:
@@ -196,10 +197,12 @@ class GeneticAlgorithm:
         encrypted_code = open('enc.txt', 'r').read().replace('\n', ' ').upper()
 
         # Replace letters in the encrypted code with the decrypted letter or keep special characters
-        decrypted_code = ''.join(decryption_key.get(letter, letter) for letter in encrypted_code)
+        for key in decryption_key:
+            if key != 'fitness':
+                encrypted_code = encrypted_code.replace(key, decryption_key[key].lower())
 
         # Calculate percentage of correct words
-        words = decrypted_code.split()
+        words = encrypted_code.split()
         total_words = len(words)
 
         with open('dec.txt', 'r') as f:
@@ -208,8 +211,8 @@ class GeneticAlgorithm:
         correct_words = sum(word in decrypted_words for word in words)
         percentage_correct = (correct_words / total_words) * 100
 
-        print(f"Decrypted Code: {decrypted_code}")
-        print(f"Percentage of Correct Words: {percentage_correct:.2f}%")
+        print(f"Decrypted Code: {encrypted_code}")
+        print(f"Percentage of Correct Words: {percentage_correct:.6f}%")
 
 
 def main():
