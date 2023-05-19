@@ -112,16 +112,15 @@ class GeneticAlgorithm:
         # Create new children through crossover
         children = self._evolution_step(parents)
         print("children number: ", len(children))
-        self.population = []
+        for child in children:
+            self._evaluate_fitness(child)
         self.population.extend(children)
-        # TODO: check children vs least fit individuals
-        # Remove the least fit individuals to maintain population size
+        # Remove the least fit individuals to maintain population size by first sorting by fitness and then removing
+        # the last n individuals where n is the number of children created
         self.population = sorted(self.population, key=lambda x: float(x['fitness']), reverse=True)[
                           :self.population_size]
+        self.population = self.population[:-len(children)]
 
-        # Evaluate fitness of new population
-        for individual in self.population:
-            self._evaluate_fitness(individual)
 
     def _compute_fitness(self, individual):
         fitness = 0
@@ -176,7 +175,7 @@ class GeneticAlgorithm:
         # evolve the population according to the fitness
         bar = tqdm(total=generations, desc='Generations')
         for generation in range(1, generations + 1):
-            self.evolve(generation)
+            self.evolve()
             bar.update(1)
         bar.close()
 
