@@ -43,6 +43,7 @@ def crossover(parent1, parent2):
 
 class GeneticAlgorithm:
     def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, elitism_rate=0.1):
+        self.start_time = time.time()
         self.population_size = population_size
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
@@ -50,7 +51,6 @@ class GeneticAlgorithm:
         self.encryption_code = self.load_encryption_code()
         self.single_letter_words = set(word for word in self.encryption_code.split() if len(word) == 1)
         if len(self.single_letter_words) > 2:
-            print(self.single_letter_words)
             print("Error: More than 3 single letter words in encryption code")
             sys.exit(1)
         self.common_words = load_common_words()
@@ -106,18 +106,13 @@ class GeneticAlgorithm:
             children.append(child)
         return children
 
-    def evolve(self, generation):
-        # get total sum of fitness
-        population_sum = sum(individual_dict['fitness'] for individual_dict in self.population)
-        print("Generation {} population fitness: {}".format(generation, population_sum))
+    def evolve(self):
         # select parents
         parents = self.get_parents()
         # Create new children through crossover
         children = self._evolution_step(parents)
-        elite_size = int(self.population_size * self.elitism_rate)
-        elites = sorted(self.population, key=lambda x: x['fitness'], reverse=True)[:elite_size]
+        print("children number: ", len(children))
         self.population = []
-        self.population.extend(elites)
         self.population.extend(children)
         # TODO: check children vs least fit individuals
         # Remove the least fit individuals to maintain population size
@@ -152,7 +147,7 @@ class GeneticAlgorithm:
 
         for letter in letter_freq:
             if letter != ' ':  # Exclude space character
-                fitness -= abs(self.letter_freq[letter] * 1000 - letter_freq[letter])
+                fitness -= abs(self.letter_freq[letter] * len(self.encryption_code) - letter_freq[letter])
 
         two_letter_freq = {}
         for i in range(len(self.encryption_code) - 1):
@@ -165,7 +160,7 @@ class GeneticAlgorithm:
                 two_letter_freq[pair] = 1
 
         for pair in two_letter_freq:
-            fitness -= abs(self.two_letter_freq[pair] * 1000 - two_letter_freq[pair])
+            fitness -= abs(self.two_letter_freq[pair] * len(self.encryption_code) - two_letter_freq[pair])
 
         return fitness
 
@@ -173,18 +168,16 @@ class GeneticAlgorithm:
         return self._compute_fitness(individual)
 
     def run(self, generations=50):
-        bar = tqdm(total=generations, desc='Generations')
-        start_time = time.time()
         # calculate fitness for each individual
         for individual_dict in self.population:
             individual_dict['fitness'] = self._compute_fitness(individual_dict)
         end_time = time.time()
-        print("Initial population fitness calculated in {} seconds".format(end_time - start_time))
+        print("Initial population fitness calculated in {} seconds".format(end_time - self.start_time))
         # evolve the population according to the fitness
+        bar = tqdm(total=generations, desc='Generations')
         for generation in range(1, generations + 1):
             self.evolve(generation)
             bar.update(1)
-
         bar.close()
 
 
