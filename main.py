@@ -61,7 +61,7 @@ class GeneticAlgorithm:
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
         self.elitism_rate = elitism_rate
-        self.encryption_code, self.letter_freq = self.load_encryption_code()
+        self.encryption_code, self.letter_freq, self.two_letter_freq = self.load_encryption_code()
         self.single_letter_words = list(set(word for word in self.encryption_code.split() if len(word) == 1))
         if len(self.single_letter_words) > 2:
             print("Error: More than 3 single letter words in encryption code")
@@ -69,8 +69,7 @@ class GeneticAlgorithm:
         self.population = self._create_population()
 
     def load_encryption_code(self):
-        letter_freq = {}
-        with open('enc.txt', 'r') as f:
+        with open('test2enc.txt', 'r') as f:
             self.single_letter_words = set(word.upper() for word in f.read().split() if len(word) == 1)
             f.seek(0)
             # replace all commas and periods with spaces
@@ -81,6 +80,7 @@ class GeneticAlgorithm:
                 word for word in encryption_code.split() if len(word) > 1 or word in self.single_letter_words)
 
             # Calculate letter frequencies
+            letter_freq = {}
             for letter in encryption_code:
                 if letter != ' ':
                     if letter in letter_freq:
@@ -91,8 +91,20 @@ class GeneticAlgorithm:
             total_letters = sum(letter_freq.values())
             for letter in letter_freq:
                 letter_freq[letter] /= total_letters
-            print()
-        return encryption_code, letter_freq
+
+            # Calculate two letter frequencies in the encryption code
+            two_letter_freq = {}
+            for i in range(len(encryption_code) - 1):
+                two_letter = encryption_code[i:i+2]
+                if two_letter in two_letter_freq:
+                    two_letter_freq[two_letter] += 1
+                else:
+                    two_letter_freq[two_letter] = 1
+            # Normalize two letter frequencies
+            total_two_letters = sum(two_letter_freq.values())
+            for two_letter in two_letter_freq:
+                two_letter_freq[two_letter] /= total_two_letters
+        return encryption_code, letter_freq, two_letter_freq
 
     def _create_population(self):
         population = []
@@ -146,13 +158,11 @@ class GeneticAlgorithm:
     def _compute_fitness(self, individual):
         fitness = 0
         encryption_code = self.encryption_code
-        encryption_code_length = len(encryption_code)
 
-        if individual[self.single_letter_words[0]] in {"A", "I"} or individual[self.single_letter_words[1]] in {"A",
-                                                                                                                "I"}:
+        single_word_count = sum(individual[word] in {"A", "I"} for word in self.single_letter_words)
+        if single_word_count > 0:
             fitness += 100
-        if individual[self.single_letter_words[0]] in {"A", "I"} and individual[self.single_letter_words[1]] in {"A",
-                                                                                                                 "I"}:
+        if single_word_count == 2:
             fitness += 100
 
         for word in encryption_code.split():
@@ -163,19 +173,9 @@ class GeneticAlgorithm:
             if decrypted_word.lower() in COMMON_WORDS:
                 fitness += 1
 
-        two_letter_freq = {}
-        for i in range(encryption_code_length - 1):
-            if encryption_code[i] == ' ' or encryption_code[i + 1] == ' ':  # Exclude space character
-                continue
-            pair = individual[encryption_code[i]] + individual[encryption_code[i + 1]]  # Get pair of letters
-            if pair in two_letter_freq:
-                two_letter_freq[pair] += 1
-            else:
-                two_letter_freq[pair] = 1
-
-        for pair in two_letter_freq:
-            pair_freq_value = two_letter_freq[pair]
-            fitness -= abs(TWO_LETTER_FREQ[pair] * encryption_code_length - pair_freq_value)
+        for key in self.two_letter_freq:
+            if key in individual:
+                fitness -= abs(self.two_letter_freq[key] - self.two_letter_freq[individual[key] + individual[key]])
 
         for key in self.letter_freq:
             fitness -= abs(LETTER_FREQ[individual[key]] - self.letter_freq[key])
@@ -197,7 +197,7 @@ class GeneticAlgorithm:
     def decrypt(self):
         decryption_key = self.population[0]
         print(f"Decryption Key: {decryption_key}")
-        encrypted_code = open('enc.txt', 'r').read().replace('\n', ' ').upper()
+        encrypted_code = open('test2enc.txt', 'r').read().replace('\n', ' ').upper()
 
         # Replace letters in the encrypted code with the decrypted letter or keep special characters
         for key in decryption_key:
@@ -208,7 +208,7 @@ class GeneticAlgorithm:
         words = encrypted_code.split()
         total_words = len(words)
 
-        with open('dec.txt', 'r') as f:
+        with open('test2dec.txt', 'r') as f:
             decrypted_words = set(f.read().split())
 
         correct_words = sum(word in decrypted_words for word in words)
@@ -222,7 +222,7 @@ def main():
     # load encryption code
     algorithm = GeneticAlgorithm(population_size=1000, selection_rate=0.3, mutation_rate=0.05)
     # run algorithm
-    algorithm.run(100)
+    algorithm.run(200)
 
 
 if __name__ == "__main__":
