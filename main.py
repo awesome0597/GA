@@ -62,7 +62,8 @@ class GeneticAlgorithm:
         self.mutation_rate = mutation_rate
         self.elitism_rate = elitism_rate
         self.encryption_code = self.load_encryption_code()
-        self.single_letter_words = set(word for word in self.encryption_code.split() if len(word) == 1)
+        self.single_letter_words = [word for word in self.encryption_code.split() if len(word) == 1]
+        print(self.single_letter_words[0])
         if len(self.single_letter_words) > 2:
             print("Error: More than 3 single letter words in encryption code")
             sys.exit(1)
@@ -135,9 +136,9 @@ class GeneticAlgorithm:
         encryption_code_length = len(encryption_code)
         population_length = len(self.population)
 
-        if individual["A"] in self.single_letter_words or individual["I"] in self.single_letter_words:
+        if individual[self.single_letter_words[0]] in {"A","I"} or individual[self.single_letter_words[1]] in {"A","I"}:
             fitness += 5.25
-        if individual["A"] in self.single_letter_words and individual["I"] in self.single_letter_words:
+        if individual[self.single_letter_words[0]] in {"A","I"} and individual[self.single_letter_words[1]] in {"A","I"}:
             fitness += 5.25
 
         for word in encryption_code.split():
