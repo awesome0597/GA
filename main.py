@@ -218,7 +218,8 @@ class GeneticAlgorithm:
 def main():
     # load encryption code
     algorithm = GeneticAlgorithm(population_size=1000, selection_rate=0.3, mutation_rate=0.05)
-    algorithm.run(50)
+    # run algorithm
+    algorithm.run(100)
 
 
 if __name__ == "__main__":
