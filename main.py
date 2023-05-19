@@ -186,24 +186,35 @@ class GeneticAlgorithm:
             self.evolve()
             bar.update(1)
         bar.close()
+        # decrypt the code using the best individual
+        self.decrypt()
+
+    def decrypt(self):
+        decryption_key = self.population[0]
+        print(f"Decryption Key: {decryption_key}")
+        encrypted_code = open('enc.txt', 'r').read().replace('\n', ' ').upper()
+
+        # Replace letters in the encrypted code with the decrypted letter or keep special characters
+        decrypted_code = ''.join(decryption_key.get(letter, letter) for letter in encrypted_code)
+
+        # Calculate percentage of correct words
+        words = decrypted_code.split()
+        total_words = len(words)
+
+        with open('dec.txt', 'r') as f:
+            decrypted_words = set(f.read().split())
+
+        correct_words = sum(word in decrypted_words for word in words)
+        percentage_correct = (correct_words / total_words) * 100
+
+        print(f"Decrypted Code: {decrypted_code}")
+        print(f"Percentage of Correct Words: {percentage_correct:.2f}%")
 
 
 def main():
     # load encryption code
     algorithm = GeneticAlgorithm(population_size=1000, selection_rate=0.3, mutation_rate=0.05)
-    algorithm.run(100)
-    print(algorithm.population[0])
-    # use the best individual to decrypt the code
-    encryption_code = algorithm.encryption_code
-    decryption_key = algorithm.population[0]
-    decrypted_code = []
-    for letter in encryption_code:
-        if letter == ' ':
-            decrypted_code.append(' ')
-        else:
-            decrypted_code.append(decryption_key[letter])
-    decrypted_code = ''.join(decrypted_code)
-    print(decrypted_code)
+    algorithm.run(50)
 
 
 if __name__ == "__main__":
