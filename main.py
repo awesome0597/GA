@@ -62,8 +62,8 @@ class GeneticAlgorithm:
         self.mutation_rate = mutation_rate
         self.elitism_rate = elitism_rate
         self.encryption_code = self.load_encryption_code()
-        self.single_letter_words = [word for word in self.encryption_code.split() if len(word) == 1]
-        print(self.single_letter_words[0])
+        self.single_letter_words = list(set(word for word in self.encryption_code.split() if len(word) == 1))
+        print(self.single_letter_words)
         if len(self.single_letter_words) > 2:
             print("Error: More than 3 single letter words in encryption code")
             sys.exit(1)
@@ -159,13 +159,13 @@ class GeneticAlgorithm:
         for letter in letter_freq:
             if letter != ' ':  # Exclude space character
                 letter_freq_value = letter_freq[letter]
-                fitness -= abs(LETTER_FREQ[letter] * encryption_code_length - letter_freq_value)
+                fitness -= abs(LETTER_FREQ[individual[letter]] * encryption_code_length - letter_freq_value)
 
         two_letter_freq = {}
         for i in range(encryption_code_length - 1):
             if encryption_code[i] == ' ' or encryption_code[i + 1] == ' ':  # Exclude space character
                 continue
-            pair = encryption_code[i] + encryption_code[i + 1]
+            pair = individual[encryption_code[i]] + individual[encryption_code[i + 1]] # Get pair of letters
             if pair in two_letter_freq:
                 two_letter_freq[pair] += 1
             else:
