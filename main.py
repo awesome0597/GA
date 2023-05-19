@@ -1,7 +1,6 @@
 import random
 import sys
 import string
-import time
 import re
 from tqdm import tqdm
 
@@ -9,7 +8,7 @@ from tqdm import tqdm
 def load_common_words():
     with open('dict.txt', 'r') as f:
         common_words = set(f.read().split())
-    return sorted(common_words, key=len, reverse=False)
+    return common_words
 
 
 def load_letter_frequencies():
@@ -28,6 +27,11 @@ def load_two_letter_frequencies():
             freq, letter = line.strip().split("\t")
             two_letter_freq[letter] = float(freq)
     return two_letter_freq
+
+
+COMMON_WORDS = load_common_words()
+LETTER_FREQ = load_letter_frequencies()
+TWO_LETTER_FREQ = load_two_letter_frequencies()
 
 
 def crossover(parent1, parent2):
@@ -53,7 +57,6 @@ def crossover(parent1, parent2):
 
 class GeneticAlgorithm:
     def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, elitism_rate=0.1):
-        self.start_time = time.time()
         self.population_size = population_size
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
@@ -63,9 +66,6 @@ class GeneticAlgorithm:
         if len(self.single_letter_words) > 2:
             print("Error: More than 3 single letter words in encryption code")
             sys.exit(1)
-        self.common_words = load_common_words()
-        self.letter_freq = load_letter_frequencies()
-        self.two_letter_freq = load_two_letter_frequencies()
         self.population = self._create_population()
 
     def load_encryption_code(self):
@@ -74,9 +74,7 @@ class GeneticAlgorithm:
             f.seek(0)
             # replace all commas and periods with spaces
             encryption_code = f.read().replace('\n', ' ').upper()
-            encryption_code = encryption_code.replace(',', ' ')
-            encryption_code = encryption_code.replace('.', ' ')
-            encryption_code = encryption_code.replace(';', ' ')
+            encryption_code = re.sub(r'[.,;]', ' ', encryption_code)
             # remove all single letter words that are not in single_letter_words
             encryption_code = ' '.join(
                 word for word in encryption_code.split() if len(word) > 1 or word in self.single_letter_words)
@@ -122,7 +120,6 @@ class GeneticAlgorithm:
         parents = self.get_parents()
         # Create new children through crossover
         children = self._evolution_step(parents)
-        print("children number: ", len(children))
         for child in children:
             self._evaluate_fitness(child)
         self.population.extend(children)
@@ -134,21 +131,25 @@ class GeneticAlgorithm:
 
     def _compute_fitness(self, individual):
         fitness = 0
+        encryption_code = self.encryption_code
+        encryption_code_length = len(encryption_code)
+        population_length = len(self.population)
 
         if individual["A"] in self.single_letter_words or individual["I"] in self.single_letter_words:
             fitness += 5.25
         if individual["A"] in self.single_letter_words and individual["I"] in self.single_letter_words:
             fitness += 5.25
 
-        for word in self.encryption_code.split():
-            decrypted_word = ""
+        for word in encryption_code.split():
+            decrypted_word = []
             for letter in word:
-                decrypted_word += individual[letter]
-            if decrypted_word in self.common_words:
+                decrypted_word.append(individual[letter])
+            decrypted_word = ''.join(decrypted_word)
+            if decrypted_word in COMMON_WORDS:
                 fitness += 1
 
         letter_freq = {}
-        for letter in self.encryption_code:
+        for letter in encryption_code:
             if letter in letter_freq:
                 letter_freq[letter] += 1
             else:
@@ -156,32 +157,29 @@ class GeneticAlgorithm:
 
         for letter in letter_freq:
             if letter != ' ':  # Exclude space character
-                fitness -= abs(self.letter_freq[letter] * len(self.encryption_code) - letter_freq[letter])
+                letter_freq_value = letter_freq[letter]
+                fitness -= abs(LETTER_FREQ[letter] * encryption_code_length - letter_freq_value)
 
         two_letter_freq = {}
-        for i in range(len(self.encryption_code) - 1):
-            if self.encryption_code[i] == ' ' or self.encryption_code[i + 1] == ' ':  # Exclude space character
+        for i in range(encryption_code_length - 1):
+            if encryption_code[i] == ' ' or encryption_code[i + 1] == ' ':  # Exclude space character
                 continue
-            pair = self.encryption_code[i] + self.encryption_code[i + 1]
+            pair = encryption_code[i] + encryption_code[i + 1]
             if pair in two_letter_freq:
                 two_letter_freq[pair] += 1
             else:
                 two_letter_freq[pair] = 1
 
         for pair in two_letter_freq:
-            fitness -= abs(self.two_letter_freq[pair] * len(self.encryption_code) - two_letter_freq[pair])
+            pair_freq_value = two_letter_freq[pair]
+            fitness -= abs(TWO_LETTER_FREQ[pair] * encryption_code_length - pair_freq_value)
 
         return fitness
-
-    def _compute_fitness_parallel(self, individual):
-        return self._compute_fitness(individual)
 
     def run(self, generations=50):
         # calculate fitness for each individual
         for individual_dict in self.population:
             individual_dict['fitness'] = self._compute_fitness(individual_dict)
-        end_time = time.time()
-        print("Initial population fitness calculated in {} seconds".format(end_time - self.start_time))
         # evolve the population according to the fitness
         bar = tqdm(total=generations, desc='Generations')
         for generation in range(1, generations + 1):
@@ -193,8 +191,19 @@ class GeneticAlgorithm:
 def main():
     # load encryption code
     algorithm = GeneticAlgorithm(population_size=1000, selection_rate=0.3, mutation_rate=0.05)
-    algorithm.run()
+    algorithm.run(100)
     print(algorithm.population[0])
+    # use the best individual to decrypt the code
+    encryption_code = algorithm.encryption_code
+    decryption_key = algorithm.population[0]
+    decrypted_code = []
+    for letter in encryption_code:
+        if letter == ' ':
+            decrypted_code.append(' ')
+        else:
+            decrypted_code.append(decryption_key[letter])
+    decrypted_code = ''.join(decrypted_code)
+    print(decrypted_code)
 
 
 if __name__ == "__main__":
