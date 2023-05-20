@@ -56,12 +56,11 @@ def crossover(parent1, parent2):
 
 
 class GeneticAlgorithm:
-    def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, elitism_rate=0.1,
-                 convergence_generations=10, convergence_threshold=0.001):
+    def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, convergence_generations=10,
+                 convergence_threshold=0.001):
         self.population_size = population_size
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
-        self.elitism_rate = elitism_rate
         self.encryption_code, self.letter_freq, self.two_letter_freq = self.load_encryption_code()
         self.single_letter_words = list(set(word for word in self.encryption_code.split() if len(word) == 1))
         if len(self.single_letter_words) > 2:
@@ -71,12 +70,6 @@ class GeneticAlgorithm:
         self.convergence_generations = convergence_generations
         self.convergence_threshold = convergence_threshold
         self.best_fitness_history = []
-
-    def _is_converged(self):
-        if len(self.best_fitness_history) < self.convergence_generations:
-            return False
-        # Calculate the difference between the best fitness values of the last 'convergence_generations' generations
-        fitness_diff = max(self.best_fitness_history) - min(self.best_fitness_history)
 
     def load_encryption_code(self):
         with open('enc.txt', 'r') as f:
@@ -219,21 +212,24 @@ class GeneticAlgorithm:
             fitness -= abs(LETTER_FREQ[individual[key]] - self.letter_freq[key])
         return fitness
 
-    def run(self, generations=50):
+    def run(self):
         # calculate fitness for each individual
         for individual_dict in self.population:
             individual_dict['fitness'] = self._compute_fitness(individual_dict)
         self.population = sorted(self.population, key=lambda x: x['fitness'], reverse=True)
         # evolve the population according to the fitness
-        target_fitness = 900  # The fitness value to track progress towards
+        target_fitness = 1200  # The fitness value to track progress towards
 
         initial_fitness = self.population[0]['fitness']
         generations = 0
         local_minima = 0
         fitness = self.population[0]['fitness']
+        #  create bar
+        bar = tqdm(total=target_fitness, initial=initial_fitness, desc="Fitness", position=0, leave=True)
 
         while self.population[0]['fitness'] < target_fitness:
             self.evolve()
+            bar.update(self.population[0]['fitness'] - fitness)
             current_fitness = self.population[0]['fitness']
             if current_fitness == fitness:
                 local_minima += 1
@@ -241,15 +237,11 @@ class GeneticAlgorithm:
                 local_minima = 0
             fitness = current_fitness
             if local_minima > 100:
+                print("Local minima reached")
                 break
-            print(self.population[0]['fitness'])
+            bar.set_description(f"Fitness: {self.population[0]['fitness']}")
             generations += 1
-
-        # for generation in range(1, generations + 1):
-        #     self.evolve()
-        #     bar.update(1)
-        # bar.close()
-        # decrypt the code using the best individual
+        bar.close()
         print(generations)
         self.decrypt()
 
@@ -291,7 +283,7 @@ def main():
     # load encryption code
     algorithm = GeneticAlgorithm(population_size=2000, selection_rate=0.3, mutation_rate=0.05)
     # run algorithm
-    algorithm.run(200)
+    algorithm.run()
 
 
 if __name__ == "__main__":
