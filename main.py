@@ -103,15 +103,42 @@ class GeneticAlgorithm:
                     two_letter_freq[pair] += 1
                 else:
                     two_letter_freq[pair] = 1
-            # Normalize two letter frequencies
-
-
 
         return encryption_code, letter_freq, two_letter_freq
 
+
     def _create_population(self):
         population = []
-        for _ in range(self.population_size):
+        abcPercent = int(self.population_size * 0.1)
+        singleLetterPercent = int(self.population_size * 0.1)
+        rest = self.population_size - abcPercent - singleLetterPercent
+        for i in range(abcPercent):
+            individual = dict(zip(string.ascii_uppercase, string.ascii_uppercase))
+            population.append(individual)
+
+        for i in range(abcPercent, singleLetterPercent):
+            # set the letters A and I as values randomly in the individual based on the keys in single_letter_words
+            individual = dict(zip(string.ascii_uppercase, random.sample(string.ascii_uppercase, 26)))
+            # find where the letters A and I are in the individual
+            for key, value in individual.items():
+                if i % 2 == 0:
+                    if value == 'A':
+                        individual[key] = individual[self.single_letter_words[0]]
+                        individual[self.single_letter_words[0]] = 'A'
+                    elif value == 'I':
+                        individual[key] = individual[self.single_letter_words[1]]
+                        individual[self.single_letter_words[1]] = 'I'
+                    population.append(individual)
+                else:
+                    if value == 'A':
+                        individual[key] = individual[self.single_letter_words[1]]
+                        individual[self.single_letter_words[1]] = 'A'
+                    elif value == 'I':
+                        individual[key] = individual[self.single_letter_words[0]]
+                        individual[self.single_letter_words[0]] = 'I'
+                    population.append(individual)
+
+        for _ in range(rest, self.population_size):
             individual = dict(zip(string.ascii_uppercase, random.sample(string.ascii_uppercase, 26)))
             population.append(individual)
         return population
@@ -255,7 +282,7 @@ class GeneticAlgorithm:
 
 def main():
     # load encryption code
-    algorithm = GeneticAlgorithm(population_size=1000, selection_rate=0.3, mutation_rate=0.05)
+    algorithm = GeneticAlgorithm(population_size=1500, selection_rate=0.5, mutation_rate=0.05)
     # run algorithm
     algorithm.run(200)
 
