@@ -88,9 +88,8 @@ class GeneticAlgorithm:
             # remove all single letter words that are not in single_letter_words
             encryption_code = ' '.join(
                 word for word in encryption_code.split() if len(word) > 1 or word in self.single_letter_words)
-
-            # Calculate letter frequencies
             letter_freq = {}
+            # Calculate letter frequencies
             for letter in encryption_code:
                 if letter != ' ':
                     if letter in letter_freq:
@@ -118,7 +117,36 @@ class GeneticAlgorithm:
 
     def _create_population(self):
         population = []
-        for _ in range(self.population_size):
+        abcPercent = int(self.population_size * 0.1)
+        singleLetterPercent = int(self.population_size * 0.1)
+        rest = self.population_size - abcPercent - singleLetterPercent
+        for i in range(abcPercent):
+            individual = dict(zip(string.ascii_uppercase, string.ascii_uppercase))
+            population.append(individual)
+
+        for i in range(abcPercent, singleLetterPercent):
+            # set the letters A and I as values randomly in the individual based on the keys in single_letter_words
+            individual = dict(zip(string.ascii_uppercase, random.sample(string.ascii_uppercase, 26)))
+            # find where the letters A and I are in the individual
+            for key, value in individual.items():
+                if i % 2 == 0:
+                    if value == 'A':
+                        individual[key] = individual[self.single_letter_words[0]]
+                        individual[self.single_letter_words[0]] = 'A'
+                    elif value == 'I':
+                        individual[key] = individual[self.single_letter_words[1]]
+                        individual[self.single_letter_words[1]] = 'I'
+                    population.append(individual)
+                else:
+                    if value == 'A':
+                        individual[key] = individual[self.single_letter_words[1]]
+                        individual[self.single_letter_words[1]] = 'A'
+                    elif value == 'I':
+                        individual[key] = individual[self.single_letter_words[0]]
+                        individual[self.single_letter_words[0]] = 'I'
+                    population.append(individual)
+
+        for _ in range(rest, self.population_size):
             individual = dict(zip(string.ascii_uppercase, random.sample(string.ascii_uppercase, 26)))
             population.append(individual)
         return population
@@ -195,13 +223,34 @@ class GeneticAlgorithm:
         # calculate fitness for each individual
         for individual_dict in self.population:
             individual_dict['fitness'] = self._compute_fitness(individual_dict)
+        self.population = sorted(self.population, key=lambda x: x['fitness'], reverse=True)
         # evolve the population according to the fitness
-        bar = tqdm(total=generations, desc='Generations')
-        for generation in range(1, generations + 1):
+        target_fitness = 900  # The fitness value to track progress towards
+
+        initial_fitness = self.population[0]['fitness']
+        generations = 0
+        local_minima = 0
+        fitness = self.population[0]['fitness']
+
+        while self.population[0]['fitness'] < target_fitness:
             self.evolve()
-            bar.update(1)
-        bar.close()
+            current_fitness = self.population[0]['fitness']
+            if current_fitness == fitness:
+                local_minima += 1
+            else:
+                local_minima = 0
+            fitness = current_fitness
+            if local_minima > 100:
+                break
+            print(self.population[0]['fitness'])
+            generations += 1
+
+        # for generation in range(1, generations + 1):
+        #     self.evolve()
+        #     bar.update(1)
+        # bar.close()
         # decrypt the code using the best individual
+        print(generations)
         self.decrypt()
 
     def decrypt(self):
