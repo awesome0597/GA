@@ -56,7 +56,8 @@ def crossover(parent1, parent2):
 
 
 class GeneticAlgorithm:
-    def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, elitism_rate=0.1):
+    def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, elitism_rate=0.1,
+                 convergence_generations=10, convergence_threshold=0.001):
         self.population_size = population_size
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
@@ -67,9 +68,18 @@ class GeneticAlgorithm:
             print("Error: More than 3 single letter words in encryption code")
             sys.exit(1)
         self.population = self._create_population()
+        self.convergence_generations = convergence_generations
+        self.convergence_threshold = convergence_threshold
+        self.best_fitness_history = []
+
+    def _is_converged(self):
+        if len(self.best_fitness_history) < self.convergence_generations:
+            return False
+        # Calculate the difference between the best fitness values of the last 'convergence_generations' generations
+        fitness_diff = max(self.best_fitness_history) - min(self.best_fitness_history)
 
     def load_encryption_code(self):
-        with open('test2enc.txt', 'r') as f:
+        with open('enc.txt', 'r') as f:
             self.single_letter_words = set(word.upper() for word in f.read().split() if len(word) == 1)
             f.seek(0)
             # replace all commas and periods with spaces
@@ -95,7 +105,7 @@ class GeneticAlgorithm:
             # Calculate two letter frequencies in the encryption code
             two_letter_freq = {}
             for i in range(len(encryption_code) - 1):
-                two_letter = encryption_code[i:i+2]
+                two_letter = encryption_code[i:i + 2]
                 if two_letter in two_letter_freq:
                     two_letter_freq[two_letter] += 1
                 else:
@@ -197,18 +207,28 @@ class GeneticAlgorithm:
     def decrypt(self):
         decryption_key = self.population[0]
         print(f"Decryption Key: {decryption_key}")
-        encrypted_code = open('test2enc.txt', 'r').read().replace('\n', ' ').upper()
+        encrypted_code = open('enc.txt', 'r').read().replace('\n', ' ').upper()
 
         # Replace letters in the encrypted code with the decrypted letter or keep special characters
         for key in decryption_key:
             if key != 'fitness':
                 encrypted_code = encrypted_code.replace(key, decryption_key[key].lower())
 
+        # Save the decrypted text to plain.txt
+        with open('plain.txt', 'w') as plain_file:
+            plain_file.write(encrypted_code)
+
+        # Save the key to perm.txt
+        with open('perm.txt', 'w') as perm_file:
+            for key, value in decryption_key.items():
+                if key != 'fitness':
+                    perm_file.write(f"{key}: {value}\n")
+
         # Calculate percentage of correct words
         words = encrypted_code.split()
         total_words = len(words)
 
-        with open('test2dec.txt', 'r') as f:
+        with open('dec.txt', 'r') as f:
             decrypted_words = set(f.read().split())
 
         correct_words = sum(word in decrypted_words for word in words)
@@ -220,7 +240,7 @@ class GeneticAlgorithm:
 
 def main():
     # load encryption code
-    algorithm = GeneticAlgorithm(population_size=1000, selection_rate=0.3, mutation_rate=0.05)
+    algorithm = GeneticAlgorithm(population_size=2000, selection_rate=0.3, mutation_rate=0.05)
     # run algorithm
     algorithm.run(200)
 
