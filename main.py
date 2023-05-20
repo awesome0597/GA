@@ -215,7 +215,7 @@ class GeneticAlgorithm:
             individual_dict['fitness'] = self._compute_fitness(individual_dict)
         self.population = sorted(self.population, key=lambda x: x['fitness'], reverse=True)
         # evolve the population according to the fitness
-        target_fitness = -900  # The fitness value to track progress towards
+        target_fitness = 900  # The fitness value to track progress towards
 
         initial_fitness = self.population[0]['fitness']
         generations = 0
