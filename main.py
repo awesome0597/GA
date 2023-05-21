@@ -72,6 +72,7 @@ class GeneticAlgorithm:
         self.convergence_threshold = convergence_threshold
         self.best_fitness_history = []
         self.fitness_counter = 0
+        self.word_percentage = 0
 
     def load_encryption_code(self):
         with open('enc.txt', 'r') as f:
@@ -216,6 +217,8 @@ class GeneticAlgorithm:
 
     def _compute_fitness(self, individual):
         fitness = 0
+        word_percent = 0
+
         encryption_code = self.encryption_code
 
         single_word_count = sum(individual[word] in {"A", "I"} for word in self.single_letter_words)
@@ -231,6 +234,9 @@ class GeneticAlgorithm:
             decrypted_word = ''.join(decrypted_word)
             if decrypted_word.lower() in COMMON_WORDS:
                 fitness += 1
+                word_percent += 1
+
+        individual['word_percent'] = word_percent / len(encryption_code.split())
 
         for key in self.two_letter_freq:
             if key in individual:
@@ -246,29 +252,33 @@ class GeneticAlgorithm:
             individual_dict['fitness'] = self._compute_fitness(individual_dict)
         self.population = sorted(self.population, key=lambda x: x['fitness'], reverse=True)
         # evolve the population according to the fitness
-        target_fitness = 1270  # The fitness value to track progress towards
+        target_word_percentage = 0.8  # The fitness value to track progress towards
 
-        initial_fitness = self.population[0]['fitness']
+        initial_word_percentage = self.population[0]['word_percent']
         generations = 0
         local_minima = 0
-        fitness = self.population[0]['fitness']
+        word_percentage = self.population[0]['word_percent']
         #  create bar
-        bar = tqdm(total=target_fitness, initial=initial_fitness, desc="Fitness", position=0, leave=True)
+        bar = tqdm(total=target_word_percentage, initial=initial_word_percentage, desc="Word Percentage", position=0,
+                   leave=True)
 
-        while self.population[0]['fitness'] < target_fitness:
+        while local_minima <= 100:
             self.evolve()
-            bar.update(self.population[0]['fitness'] - fitness)
-            current_fitness = self.population[0]['fitness']
-            if current_fitness == fitness:
+            bar.update(self.population[0]['word_percent'] - word_percentage)
+            current_word_percentage = self.population[0]['word_percent']
+            if word_percentage == current_word_percentage:
                 local_minima += 1
             else:
                 local_minima = 0
-            fitness = current_fitness
+            word_percentage = current_word_percentage
             if local_minima > 100:
                 print("Local minima reached: " + str(self.population[0]['fitness']))
-                self.nuke_em()
-                print("Nuked")
-                local_minima = 0
+                if self.population[0]['word_percent'] > 80:
+                    break
+                else:
+                    self.nuke_em()
+                    print("Nuked")
+                    local_minima = 0
             bar.set_description(f"Fitness: {self.population[0]['fitness']}")
             generations += 1
         bar.close()
