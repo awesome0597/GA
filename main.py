@@ -161,7 +161,7 @@ class GeneticAlgorithm:
         mutated_individual = dict(individual)
         if random.random() < self.mutation_rate:
             # Get letter keys
-            letter_keys = [key for key in mutated_individual.keys() if key != 'fitness']
+            letter_keys = [key for key in mutated_individual.keys() if key != 'fitness' and key != 'word_percent']
             # Swap two letter values
             key1, key2 = random.sample(letter_keys, 2)
             mutated_individual[key1], mutated_individual[key2] = mutated_individual[key2], mutated_individual[key1]
@@ -201,7 +201,7 @@ class GeneticAlgorithm:
         for individual in self.population:
             for _ in range(3):
                 # Get letter keys
-                letter_keys = [key for key in individual.keys() if key != 'fitness']
+                letter_keys = [key for key in individual.keys() if key != 'fitness' and key != 'word_percent']
                 # Swap two letter values
                 key1, key2 = random.sample(letter_keys, 2)
                 individual[key1], individual[key2] = individual[key2], individual[key1]
@@ -217,9 +217,8 @@ class GeneticAlgorithm:
 
     def _compute_fitness(self, individual):
         fitness = 0
-        word_percent = 0
-
         encryption_code = self.encryption_code
+        word_percent = 0
 
         single_word_count = sum(individual[word] in {"A", "I"} for word in self.single_letter_words)
         if single_word_count > 0:
@@ -252,7 +251,7 @@ class GeneticAlgorithm:
             individual_dict['fitness'] = self._compute_fitness(individual_dict)
         self.population = sorted(self.population, key=lambda x: x['fitness'], reverse=True)
         # evolve the population according to the fitness
-        target_word_percentage = 0.8  # The fitness value to track progress towards
+        target_word_percentage = 1  # The fitness value to track progress towards
 
         initial_word_percentage = self.population[0]['word_percent']
         generations = 0
@@ -262,7 +261,7 @@ class GeneticAlgorithm:
         bar = tqdm(total=target_word_percentage, initial=initial_word_percentage, desc="Word Percentage", position=0,
                    leave=True)
 
-        while local_minima <= 100:
+        while local_minima <= 100 and self.population[0]['word_percent'] < target_word_percentage:
             self.evolve()
             bar.update(self.population[0]['word_percent'] - word_percentage)
             current_word_percentage = self.population[0]['word_percent']
@@ -272,14 +271,14 @@ class GeneticAlgorithm:
                 local_minima = 0
             word_percentage = current_word_percentage
             if local_minima > 100:
-                print("Local minima reached: " + str(self.population[0]['fitness']))
-                if self.population[0]['word_percent'] > 80:
+                print("Local minima reached: " + str(self.population[0]['word_percent']))
+                if self.population[0]['word_percent'] > 0.8:
                     break
                 else:
                     self.nuke_em()
                     print("Nuked")
                     local_minima = 0
-            bar.set_description(f"Fitness: {self.population[0]['fitness']}")
+            bar.set_description(f"Word Percentage: {self.population[0]['word_percent']}")
             generations += 1
         bar.close()
         print(f"Generations: {generations}")
@@ -292,7 +291,7 @@ class GeneticAlgorithm:
 
         # Replace letters in the encrypted code with the decrypted letter or keep special characters
         for key in decryption_key:
-            if key != 'fitness':
+            if key != 'fitness' and key != 'word_percent':
                 encrypted_code = encrypted_code.replace(key, decryption_key[key].lower())
 
         # Save the decrypted text to plain.txt
