@@ -295,19 +295,6 @@ class GeneticAlgorithm:
                 if key != 'fitness':
                     perm_file.write(f"{key}: {value}\n")
 
-        # Calculate percentage of correct words
-        words = encrypted_code.split()
-        total_words = len(words)
-
-        with open('dec.txt', 'r') as f:
-            decrypted_words = set(f.read().split())
-
-        correct_words = sum(word in decrypted_words for word in words)
-        percentage_correct = (correct_words / total_words) * 100
-
-        print(f"Decrypted Code: {encrypted_code}")
-        print(f"Percentage of Correct Words: {percentage_correct:.6f}%")
-
 
 def main():
     # load encryption code
