@@ -265,9 +265,9 @@ class GeneticAlgorithm:
                 local_minima = 0
             fitness = current_fitness
             if local_minima > 100:
-                print("Local minima reached: " + str(self.population[0]['fitness']))
+                print("Local minima reached: \n" + str(self.population[0]['fitness']))
                 self.nuke_em()
-                print("Nuked")
+                print("Nuked\n")
                 local_minima = 0
             bar.set_description(f"Fitness: {self.population[0]['fitness']}")
             generations += 1
