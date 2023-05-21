@@ -3,6 +3,7 @@ import sys
 import string
 import re
 from tqdm import tqdm
+import math
 
 
 def load_common_words():
@@ -172,19 +173,44 @@ class GeneticAlgorithm:
             children.append(child)
         return children
 
+    def add_children(self, children):
+        for child in children:
+            self._evaluate_fitness(child)
+        self.population.extend(children)
+        self.population = sorted(self.population, key=lambda x: float(x['fitness']), reverse=True)[
+                          :self.population_size]
+        self.population = self.population[:-len(children)]
+
     def evolve(self):
         # select parents
         parents = self.get_parents()
         # Create new children through crossover
         children = self._evolution_step(parents)
-        for child in children:
-            self._evaluate_fitness(child)
+        # Add children to population
+        self.add_children(children)
+
+    def nuke_em(self):
+        # shuffle the population
+        random.shuffle(self.population)
+        # kill double the selection amount
+        self.population = self.population[:int(self.selection_rate * self.population_size * 0.5)]
+        # mutate the survivors
+        for individual in self.population:
+            for _ in range(3):
+                # Get letter keys
+                letter_keys = [key for key in individual.keys() if key != 'fitness']
+                # Swap two letter values
+                key1, key2 = random.sample(letter_keys, 2)
+                individual[key1], individual[key2] = individual[key2], individual[key1]
+        # create new children
+        children = []
+        for i in range(self.population_size - len(self.population)):
+            parent1, parent2 = random.sample(self.population, 2)
+            child = crossover(parent1, parent2)
+            child = self._mutate(child)
+            children.append(child)
+        # add children to population
         self.population.extend(children)
-        # Remove the least fit individuals to maintain population size by first sorting by fitness and then removing
-        # the last n individuals where n is the number of children created
-        self.population = sorted(self.population, key=lambda x: float(x['fitness']), reverse=True)[
-                          :self.population_size]
-        self.population = self.population[:-len(children)]
 
     def _compute_fitness(self, individual):
         fitness = 0
@@ -218,7 +244,7 @@ class GeneticAlgorithm:
             individual_dict['fitness'] = self._compute_fitness(individual_dict)
         self.population = sorted(self.population, key=lambda x: x['fitness'], reverse=True)
         # evolve the population according to the fitness
-        target_fitness = 1200  # The fitness value to track progress towards
+        target_fitness = 1270  # The fitness value to track progress towards
 
         initial_fitness = self.population[0]['fitness']
         generations = 0
@@ -237,8 +263,10 @@ class GeneticAlgorithm:
                 local_minima = 0
             fitness = current_fitness
             if local_minima > 100:
-                print("Local minima reached")
-                break
+                print("Local minima reached: " + str(self.population[0]['fitness']))
+                self.nuke_em()
+                print("Nuked")
+                local_minima = 0
             bar.set_description(f"Fitness: {self.population[0]['fitness']}")
             generations += 1
         bar.close()
