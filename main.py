@@ -71,6 +71,7 @@ class GeneticAlgorithm:
         self.convergence_generations = convergence_generations
         self.convergence_threshold = convergence_threshold
         self.best_fitness_history = []
+        self.fitness_counter = 0
 
     def load_encryption_code(self):
         with open('enc.txt', 'r') as f:
@@ -152,6 +153,7 @@ class GeneticAlgorithm:
         return parents
 
     def _evaluate_fitness(self, individual):
+        self.fitness_counter += 1
         individual['fitness'] = self._compute_fitness(individual)
 
     def _mutate(self, individual):
@@ -270,13 +272,13 @@ class GeneticAlgorithm:
             bar.set_description(f"Fitness: {self.population[0]['fitness']}")
             generations += 1
         bar.close()
-        print(generations)
+        print(f"Generations: {generations}")
         self.decrypt()
 
     def decrypt(self):
         decryption_key = self.population[0]
         print(f"Decryption Key: {decryption_key}")
-        encrypted_code = open('enc.txt', 'r').read().replace('\n', ' ').upper()
+        encrypted_code = open('enc.txt', 'r').read().upper()
 
         # Replace letters in the encrypted code with the decrypted letter or keep special characters
         for key in decryption_key:
