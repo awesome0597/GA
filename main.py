@@ -271,6 +271,11 @@ class GeneticAlgorithm:
                 local_minima = 0
             word_percentage = current_word_percentage
             if local_minima > 100:
+                print("Local minima reached: \n" + str(self.population[0]['fitness']))
+                self.nuke_em()
+                print("Nuked\n")
+                local_minima = 0
+            bar.set_description(f"Fitness: {self.population[0]['fitness']}")
                 print("Local minima reached: " + str(self.population[0]['word_percent']))
                 if self.population[0]['word_percent'] > 0.8:
                     break
@@ -280,7 +285,7 @@ class GeneticAlgorithm:
                     local_minima = 0
             bar.set_description(f"Word Percentage: {self.population[0]['word_percent']}")
             generations += 1
-        bar.close()
+            bar.close()
         print(f"Generations: {generations}")
         self.decrypt()
 
