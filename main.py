@@ -72,6 +72,7 @@ class GeneticAlgorithm:
         self.convergence_threshold = convergence_threshold
         self.best_fitness_history = []
         self.fitness_counter = 0
+        self.word_percentage = 0
 
     def load_encryption_code(self):
         with open('enc.txt', 'r') as f:
@@ -160,7 +161,7 @@ class GeneticAlgorithm:
         mutated_individual = dict(individual)
         if random.random() < self.mutation_rate:
             # Get letter keys
-            letter_keys = [key for key in mutated_individual.keys() if key != 'fitness']
+            letter_keys = [key for key in mutated_individual.keys() if key != 'fitness' and key != 'word_percent']
             # Swap two letter values
             key1, key2 = random.sample(letter_keys, 2)
             mutated_individual[key1], mutated_individual[key2] = mutated_individual[key2], mutated_individual[key1]
@@ -200,7 +201,7 @@ class GeneticAlgorithm:
         for individual in self.population:
             for _ in range(3):
                 # Get letter keys
-                letter_keys = [key for key in individual.keys() if key != 'fitness']
+                letter_keys = [key for key in individual.keys() if key != 'fitness' and key != 'word_percent']
                 # Swap two letter values
                 key1, key2 = random.sample(letter_keys, 2)
                 individual[key1], individual[key2] = individual[key2], individual[key1]
@@ -217,6 +218,7 @@ class GeneticAlgorithm:
     def _compute_fitness(self, individual):
         fitness = 0
         encryption_code = self.encryption_code
+        word_percent = 0
 
         single_word_count = sum(individual[word] in {"A", "I"} for word in self.single_letter_words)
         if single_word_count > 0:
@@ -231,6 +233,9 @@ class GeneticAlgorithm:
             decrypted_word = ''.join(decrypted_word)
             if decrypted_word.lower() in COMMON_WORDS:
                 fitness += 1
+                word_percent += 1
+
+        individual['word_percent'] = word_percent / len(encryption_code.split())
 
         for key in self.two_letter_freq:
             if key in individual:
@@ -246,30 +251,34 @@ class GeneticAlgorithm:
             individual_dict['fitness'] = self._compute_fitness(individual_dict)
         self.population = sorted(self.population, key=lambda x: x['fitness'], reverse=True)
         # evolve the population according to the fitness
-        target_fitness = 1270  # The fitness value to track progress towards
+        target_word_percentage = 1  # The fitness value to track progress towards
 
-        initial_fitness = self.population[0]['fitness']
+        initial_word_percentage = self.population[0]['word_percent']
         generations = 0
         local_minima = 0
-        fitness = self.population[0]['fitness']
+        word_percentage = self.population[0]['word_percent']
         #  create bar
-        bar = tqdm(total=target_fitness, initial=initial_fitness, desc="Fitness", position=0, leave=True)
+        bar = tqdm(total=target_word_percentage, initial=initial_word_percentage, desc="Word Percentage", position=0,
+                   leave=True)
 
-        while self.population[0]['fitness'] < target_fitness:
+        while local_minima <= 100 and self.population[0]['word_percent'] < target_word_percentage:
             self.evolve()
-            bar.update(self.population[0]['fitness'] - fitness)
-            current_fitness = self.population[0]['fitness']
-            if current_fitness == fitness:
+            bar.update(self.population[0]['word_percent'] - word_percentage)
+            current_word_percentage = self.population[0]['word_percent']
+            if word_percentage == current_word_percentage:
                 local_minima += 1
             else:
                 local_minima = 0
-            fitness = current_fitness
+            word_percentage = current_word_percentage
             if local_minima > 100:
-                print("Local minima reached: \n" + str(self.population[0]['fitness']))
-                self.nuke_em()
-                print("Nuked\n")
-                local_minima = 0
-            bar.set_description(f"Fitness: {self.population[0]['fitness']}")
+                print("Local minima reached: \n" + str(self.population[0]['word_percent']))
+                if self.population[0]['word_percent'] > 0.8:
+                    break
+                else:
+                    self.nuke_em()
+                    print("Nuked\n")
+                    local_minima = 0
+            bar.set_description(f"Word Percentage: {self.population[0]['word_percent']}")
             generations += 1
         bar.close()
         print(f"Generations: {generations}")
@@ -282,7 +291,7 @@ class GeneticAlgorithm:
 
         # Replace letters in the encrypted code with the decrypted letter or keep special characters
         for key in decryption_key:
-            if key != 'fitness':
+            if key != 'fitness' and key != 'word_percent':
                 encrypted_code = encrypted_code.replace(key, decryption_key[key].lower())
 
         # Save the decrypted text to plain.txt
