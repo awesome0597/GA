@@ -3,7 +3,6 @@ import sys
 import string
 import re
 from tqdm import tqdm
-import math
 
 
 def load_common_words():
@@ -233,11 +232,12 @@ class GeneticAlgorithm:
                 fitness += 1
 
         for key in self.two_letter_freq:
-            if key in individual:
-                fitness -= abs(self.two_letter_freq[key] - self.two_letter_freq[individual[key] + individual[key]])
+            converted_key = individual[key[0]] + individual[key[1]]  # Generate the two-letter combination using individual dict
+            fitness -= abs(TWO_LETTER_FREQ[converted_key] - self.two_letter_freq[key])
 
         for key in self.letter_freq:
             fitness -= abs(LETTER_FREQ[individual[key]] - self.letter_freq[key])
+
         return fitness
 
     def run(self):
@@ -277,7 +277,6 @@ class GeneticAlgorithm:
 
     def decrypt(self):
         decryption_key = self.population[0]
-        print(f"Decryption Key: {decryption_key}")
         encrypted_code = open('enc.txt', 'r').read().upper()
 
         # Replace letters in the encrypted code with the decrypted letter or keep special characters
