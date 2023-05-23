@@ -192,11 +192,11 @@ class GeneticAlgorithm:
         self.add_children(children)
 
     def nuke_em(self):
-        # shuffle the population
+        # Shuffle the population
         random.shuffle(self.population)
-        # kill double the selection amount
+        # Kill double the selection amount
         self.population = self.population[:int(self.selection_rate * self.population_size * 0.5)]
-        # mutate the survivors
+        # Mutate the survivors
         for individual in self.population:
             for _ in range(3):
                 # Get letter keys
@@ -204,15 +204,21 @@ class GeneticAlgorithm:
                 # Swap two letter values
                 key1, key2 = random.sample(letter_keys, 2)
                 individual[key1], individual[key2] = individual[key2], individual[key1]
-        # create new children
+                # compute fitness
+                self._evaluate_fitness(individual)
+        # Create new children
         children = []
         for i in range(self.population_size - len(self.population)):
             parent1, parent2 = random.sample(self.population, 2)
             child = crossover(parent1, parent2)
             child = self._mutate(child)
+            self._evaluate_fitness(child)
             children.append(child)
-        # add children to population
+
+        # Add children to population
         self.population.extend(children)
+        self.population = sorted(self.population, key=lambda x: float(x['fitness']), reverse=True)[
+                          :self.population_size]
 
     def _compute_fitness(self, individual):
         fitness = 0
@@ -237,8 +243,10 @@ class GeneticAlgorithm:
         individual['word_percent'] = word_percent / len(encryption_code.split())
 
         for key in self.two_letter_freq:
-            converted_key = individual[key[0]] + individual[key[1]]  # Generate the two-letter combination using individual dict
-            fitness -= abs(TWO_LETTER_FREQ[converted_key] - self.two_letter_freq[key])
+            if key[0] in individual and key[1] in individual:
+                converted_key = individual[key[0]] + individual[
+                    key[1]]  # Generate the two-letter combination using individual dict
+                fitness -= abs(self.two_letter_freq[key] - TWO_LETTER_FREQ[converted_key])
 
         for key in self.letter_freq:
             fitness -= abs(LETTER_FREQ[individual[key]] - self.letter_freq[key])
@@ -261,7 +269,7 @@ class GeneticAlgorithm:
         bar = tqdm(total=target_word_percentage, initial=initial_word_percentage, desc="Word Percentage", position=0,
                    leave=True)
 
-        while local_minima <= 100 and self.population[0]['word_percent'] < target_word_percentage:
+        while local_minima <= 10 and self.population[0]['word_percent'] < target_word_percentage:
             self.evolve()
             bar.update(self.population[0]['word_percent'] - word_percentage)
             current_word_percentage = self.population[0]['word_percent']
@@ -270,8 +278,8 @@ class GeneticAlgorithm:
             else:
                 local_minima = 0
             word_percentage = current_word_percentage
-            if local_minima > 100:
-                print("Local minima reached: \n" + str(self.population[0]['word_percent']))
+            if local_minima > 10:
+                print("Local minima reached: " + str(self.population[0]['word_percent']) + "\n")
                 if self.population[0]['word_percent'] > 0.8:
                     break
                 else:
