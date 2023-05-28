@@ -3,6 +3,7 @@ import sys
 import string
 import re
 from tqdm import tqdm
+import copy
 
 
 def load_common_words():
@@ -56,11 +57,13 @@ def crossover(parent1, parent2):
 
 
 class GeneticAlgorithm:
-    def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, convergence_generations=10,
-                 convergence_threshold=0.001):
+    def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, run_type=0, N=1,
+                 convergence_generations=10, convergence_threshold=0.001):
         self.population_size = population_size
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
+        self.run_type = run_type
+        self.N = N
         self.encryption_code, self.letter_freq, self.two_letter_freq = self.load_encryption_code()
         self.single_letter_words = list(set(word for word in self.encryption_code.split() if len(word) == 1))
         if len(self.single_letter_words) > 2:
@@ -158,13 +161,14 @@ class GeneticAlgorithm:
 
     def _mutate(self, individual):
         mutated_individual = dict(individual)
-        if random.random() < self.mutation_rate:
-            # Get letter keys
-            letter_keys = [key for key in mutated_individual.keys() if key != 'fitness' and key != 'word_percent']
-            # Swap two letter values
-            key1, key2 = random.sample(letter_keys, 2)
-            mutated_individual[key1], mutated_individual[key2] = mutated_individual[key2], mutated_individual[key1]
-        return mutated_individual
+        for _ in range(self.N):
+            if random.random() < self.mutation_rate:
+                # Get letter keys
+                letter_keys = [key for key in mutated_individual.keys() if key != 'fitness' and key != 'word_percent']
+                # Swap two letter values
+                key1, key2 = random.sample(letter_keys, 2)
+                mutated_individual[key1], mutated_individual[key2] = mutated_individual[key2], mutated_individual[key1]
+            return mutated_individual
 
     def _evolution_step(self, parents):
         children = []
@@ -250,6 +254,29 @@ class GeneticAlgorithm:
 
         return fitness
 
+    def check_local_optima(self):
+        """
+        Function is responsible for running the local optimum search for Part B of the exercise.
+        It performs a number (N) of mutations for each input permutation, and then, according to the type of the run,
+        updates the permutation and its fitness score.
+        """
+        for i in range(len(self.population)):
+            individual = self.population[i]
+            # Calculate fitness for each individual
+            individual['fitness'] = self._compute_fitness(individual)
+
+            new_individual = copy.deepcopy(individual)
+            new_individual = self._mutate(new_individual)
+            new_individual['fitness'] = self._compute_fitness(new_individual)
+
+            if new_individual['fitness'] > individual['fitness']:
+                # Lamarckian
+                if self.run_type == "lamarckian":
+                    self.population[i] = new_individual
+                # Darwinian
+                elif self.run_type == "darwinian":
+                    individual['fitness'] = new_individual['fitness']
+
     def run(self):
         # calculate fitness for each individual
         for individual_dict in self.population:
@@ -267,7 +294,11 @@ class GeneticAlgorithm:
                    leave=True)
 
         while generations < 150 and local_minima <= 10 and self.population[0]['word_percent'] < target_word_percentage:
-            self.evolve()
+            self.evolve()  # Evolve the population
+
+            if self.run_type == 0:
+                self.check_local_optima()
+
             bar.update(self.population[0]['word_percent'] - word_percentage)
             current_word_percentage = self.population[0]['word_percent']
             if word_percentage == current_word_percentage:
@@ -310,9 +341,10 @@ class GeneticAlgorithm:
 
 
 def main():
-    # load encryption code
-    algorithm = GeneticAlgorithm(population_size=2000, selection_rate=0.3, mutation_rate=0.05)
-    # run algorithm
+    fitness_scores = []
+    N = 5
+    RUN_TYPE = 1
+    algorithm = GeneticAlgorithm(population_size=2000, selection_rate=0.3, mutation_rate=0.05, run_type=RUN_TYPE, N=N)
     algorithm.run()
 
 
