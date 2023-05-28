@@ -225,20 +225,17 @@ class GeneticAlgorithm:
         encryption_code = self.encryption_code
         word_percent = 0
 
-        single_word_count = sum(individual[word] in {"A", "I"} for word in self.single_letter_words)
-        if single_word_count > 0:
-            fitness += 100
-        if single_word_count == 2:
-            fitness += 100
-
         for word in encryption_code.split():
             decrypted_word = []
             for letter in word:
                 decrypted_word.append(individual[letter])
             decrypted_word = ''.join(decrypted_word)
             if decrypted_word.lower() in COMMON_WORDS:
-                fitness += 1
-                word_percent += 1
+                if len(decrypted_word) == 1:
+                    fitness += 100
+                else:
+                    fitness += len(decrypted_word)
+                    word_percent += 1
 
         individual['word_percent'] = word_percent / len(encryption_code.split())
 
@@ -265,11 +262,11 @@ class GeneticAlgorithm:
         generations = 0
         local_minima = 0
         word_percentage = self.population[0]['word_percent']
-        #  create bar
+        # create bar
         bar = tqdm(total=target_word_percentage, initial=initial_word_percentage, desc="Word Percentage", position=0,
                    leave=True)
 
-        while local_minima <= 10 and self.population[0]['word_percent'] < target_word_percentage:
+        while generations < 150 and local_minima <= 10 and self.population[0]['word_percent'] < target_word_percentage:
             self.evolve()
             bar.update(self.population[0]['word_percent'] - word_percentage)
             current_word_percentage = self.population[0]['word_percent']
@@ -280,7 +277,7 @@ class GeneticAlgorithm:
             word_percentage = current_word_percentage
             if local_minima > 10:
                 print("Local minima reached: " + str(self.population[0]['word_percent']) + "\n")
-                if self.population[0]['word_percent'] > 0.8:
+                if self.population[0]['word_percent'] > 0.9:
                     break
                 else:
                     self.nuke_em()
