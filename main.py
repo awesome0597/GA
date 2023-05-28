@@ -3,7 +3,7 @@ import sys
 import string
 import re
 from tqdm import tqdm
-import math
+import copy
 
 
 def load_common_words():
@@ -57,11 +57,13 @@ def crossover(parent1, parent2):
 
 
 class GeneticAlgorithm:
-    def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, convergence_generations=10,
-                 convergence_threshold=0.001):
+    def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, run_type=0, N=1,
+                 convergence_generations=10, convergence_threshold=0.001):
         self.population_size = population_size
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
+        self.run_type = run_type
+        self.N = N
         self.encryption_code, self.letter_freq, self.two_letter_freq = self.load_encryption_code()
         self.single_letter_words = list(set(word for word in self.encryption_code.split() if len(word) == 1))
         if len(self.single_letter_words) > 2:
@@ -159,13 +161,14 @@ class GeneticAlgorithm:
 
     def _mutate(self, individual):
         mutated_individual = dict(individual)
-        if random.random() < self.mutation_rate:
-            # Get letter keys
-            letter_keys = [key for key in mutated_individual.keys() if key != 'fitness' and key != 'word_percent']
-            # Swap two letter values
-            key1, key2 = random.sample(letter_keys, 2)
-            mutated_individual[key1], mutated_individual[key2] = mutated_individual[key2], mutated_individual[key1]
-        return mutated_individual
+        for _ in range(self.N):
+            if random.random() < self.mutation_rate:
+                # Get letter keys
+                letter_keys = [key for key in mutated_individual.keys() if key != 'fitness' and key != 'word_percent']
+                # Swap two letter values
+                key1, key2 = random.sample(letter_keys, 2)
+                mutated_individual[key1], mutated_individual[key2] = mutated_individual[key2], mutated_individual[key1]
+            return mutated_individual
 
     def _evolution_step(self, parents):
         children = []
@@ -193,11 +196,11 @@ class GeneticAlgorithm:
         self.add_children(children)
 
     def nuke_em(self):
-        # shuffle the population
+        # Shuffle the population
         random.shuffle(self.population)
-        # kill double the selection amount
+        # Kill double the selection amount
         self.population = self.population[:int(self.selection_rate * self.population_size * 0.5)]
-        # mutate the survivors
+        # Mutate the survivors
         for individual in self.population:
             for _ in range(3):
                 # Get letter keys
@@ -205,26 +208,26 @@ class GeneticAlgorithm:
                 # Swap two letter values
                 key1, key2 = random.sample(letter_keys, 2)
                 individual[key1], individual[key2] = individual[key2], individual[key1]
-        # create new children
+                # compute fitness
+                self._evaluate_fitness(individual)
+        # Create new children
         children = []
         for i in range(self.population_size - len(self.population)):
             parent1, parent2 = random.sample(self.population, 2)
             child = crossover(parent1, parent2)
             child = self._mutate(child)
+            self._evaluate_fitness(child)
             children.append(child)
-        # add children to population
+
+        # Add children to population
         self.population.extend(children)
+        self.population = sorted(self.population, key=lambda x: float(x['fitness']), reverse=True)[
+                          :self.population_size]
 
     def _compute_fitness(self, individual):
         fitness = 0
         encryption_code = self.encryption_code
         word_percent = 0
-
-        single_word_count = sum(individual[word] in {"A", "I"} for word in self.single_letter_words)
-        if single_word_count > 0:
-            fitness += 100
-        if single_word_count == 2:
-            fitness += 100
 
         for word in encryption_code.split():
             decrypted_word = []
@@ -232,18 +235,47 @@ class GeneticAlgorithm:
                 decrypted_word.append(individual[letter])
             decrypted_word = ''.join(decrypted_word)
             if decrypted_word.lower() in COMMON_WORDS:
-                fitness += 1
-                word_percent += 1
+                if len(decrypted_word) == 1:
+                    fitness += 100
+                else:
+                    fitness += len(decrypted_word)
+                    word_percent += 1
 
         individual['word_percent'] = word_percent / len(encryption_code.split())
 
         for key in self.two_letter_freq:
-            if key in individual:
-                fitness -= abs(self.two_letter_freq[key] - self.two_letter_freq[individual[key] + individual[key]])
+            if key[0] in individual and key[1] in individual:
+                converted_key = individual[key[0]] + individual[
+                    key[1]]  # Generate the two-letter combination using individual dict
+                fitness -= abs(self.two_letter_freq[key] - TWO_LETTER_FREQ[converted_key])
 
         for key in self.letter_freq:
             fitness -= abs(LETTER_FREQ[individual[key]] - self.letter_freq[key])
+
         return fitness
+
+    def check_local_optima(self):
+        """
+        Function is responsible for running the local optimum search for Part B of the exercise.
+        It performs a number (N) of mutations for each input permutation, and then, according to the type of the run,
+        updates the permutation and its fitness score.
+        """
+        for i in range(len(self.population)):
+            individual = self.population[i]
+            # Calculate fitness for each individual
+            individual['fitness'] = self._compute_fitness(individual)
+
+            new_individual = copy.deepcopy(individual)
+            new_individual = self._mutate(new_individual)
+            new_individual['fitness'] = self._compute_fitness(new_individual)
+
+            if new_individual['fitness'] > individual['fitness']:
+                # Lamarckian
+                if self.run_type == "lamarckian":
+                    self.population[i] = new_individual
+                # Darwinian
+                elif self.run_type == "darwinian":
+                    individual['fitness'] = new_individual['fitness']
 
     def run(self):
         # calculate fitness for each individual
@@ -257,12 +289,16 @@ class GeneticAlgorithm:
         generations = 0
         local_minima = 0
         word_percentage = self.population[0]['word_percent']
-        #  create bar
+        # create bar
         bar = tqdm(total=target_word_percentage, initial=initial_word_percentage, desc="Word Percentage", position=0,
                    leave=True)
 
-        while local_minima <= 100 and self.population[0]['word_percent'] < target_word_percentage:
-            self.evolve()
+        while generations < 150 and local_minima <= 10 and self.population[0]['word_percent'] < target_word_percentage:
+            self.evolve()  # Evolve the population
+
+            if self.run_type == 0:
+                self.check_local_optima()
+
             bar.update(self.population[0]['word_percent'] - word_percentage)
             current_word_percentage = self.population[0]['word_percent']
             if word_percentage == current_word_percentage:
@@ -270,9 +306,9 @@ class GeneticAlgorithm:
             else:
                 local_minima = 0
             word_percentage = current_word_percentage
-            if local_minima > 100:
-                print("Local minima reached: \n" + str(self.population[0]['word_percent']))
-                if self.population[0]['word_percent'] > 0.8:
+            if local_minima > 10:
+                print("Local minima reached: " + str(self.population[0]['word_percent']) + "\n")
+                if self.population[0]['word_percent'] > 0.9:
                     break
                 else:
                     self.nuke_em()
@@ -286,7 +322,6 @@ class GeneticAlgorithm:
 
     def decrypt(self):
         decryption_key = self.population[0]
-        print(f"Decryption Key: {decryption_key}")
         encrypted_code = open('enc.txt', 'r').read().upper()
 
         # Replace letters in the encrypted code with the decrypted letter or keep special characters
@@ -306,9 +341,10 @@ class GeneticAlgorithm:
 
 
 def main():
-    # load encryption code
-    algorithm = GeneticAlgorithm(population_size=2000, selection_rate=0.3, mutation_rate=0.05)
-    # run algorithm
+    fitness_scores = []
+    N = 5
+    RUN_TYPE = 1
+    algorithm = GeneticAlgorithm(population_size=2000, selection_rate=0.3, mutation_rate=0.05, run_type=RUN_TYPE, N=N)
     algorithm.run()
 
 
