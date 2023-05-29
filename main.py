@@ -318,6 +318,7 @@ class GeneticAlgorithm:
             generations += 1
         bar.close()
         print(f"Generations: {generations}")
+        print(f"Calls to fitness: {self.fitness_counter}")
         self.decrypt()
 
     def decrypt(self):
