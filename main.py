@@ -23,11 +23,18 @@ def load_letter_frequencies():
 
 def load_two_letter_frequencies():
     two_letter_freq = {}
-    with open("Letter2_Freq.txt", "r") as two_letter_freq_file:
-        for line in two_letter_freq_file:
-            freq, letter = line.strip().split("\t")
-            two_letter_freq[letter] = float(freq)
+    try:
+        with open("Letter2_Freq.txt", "r") as two_letter_freq_file:
+            for line in two_letter_freq_file:
+                line = line.strip()
+                if line and not line.startswith("#"):  # Skip empty lines and comment lines
+                    freq, letter = line.split("\t")
+                    two_letter_freq[letter] = float(freq)
+    except Exception as e:
+        print(f"Error occurred while loading two-letter frequencies: {str(e)}")
     return two_letter_freq
+
+
 
 
 COMMON_WORDS = load_common_words()
@@ -57,24 +64,23 @@ def crossover(parent1, parent2):
 
 
 class GeneticAlgorithm:
-    def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, run_type=0, N=1,
+    def __init__(self, population_size=10, selection_rate=0.3, mutation_rate=0.05, run_type=0, mutation_count=1,
                  convergence_generations=10, convergence_threshold=0.001):
         self.population_size = population_size
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
         self.run_type = run_type
-        self.N = N
+        self.mutation_count = mutation_count
+        self.convergence_generations = convergence_generations
+        self.convergence_threshold = convergence_threshold
+        self.fitness_counter = 0
+        self.word_percentage = 0
+        self.generations = 0
         self.encryption_code, self.letter_freq, self.two_letter_freq = self.load_encryption_code()
         self.single_letter_words = list(set(word for word in self.encryption_code.split() if len(word) == 1))
         if len(self.single_letter_words) > 2:
             print("Error: More than 3 single letter words in encryption code")
             sys.exit(1)
-        self.population = self._create_population()
-        self.convergence_generations = convergence_generations
-        self.convergence_threshold = convergence_threshold
-        self.best_fitness_history = []
-        self.fitness_counter = 0
-        self.word_percentage = 0
 
     def load_encryption_code(self):
         with open('enc.txt', 'r') as f:
@@ -159,23 +165,26 @@ class GeneticAlgorithm:
         self.fitness_counter += 1
         individual['fitness'] = self._compute_fitness(individual)
 
-    def _mutate(self, individual):
+    def _mutate(self, individual, flag):
         mutated_individual = dict(individual)
-        for _ in range(self.N):
+        mutation_count = self.mutation_count if flag == 1 else 1
+
+        for _ in range(mutation_count):
             if random.random() < self.mutation_rate:
                 # Get letter keys
-                letter_keys = [key for key in mutated_individual.keys() if key != 'fitness' and key != 'word_percent']
+                letter_keys = [key for key in mutated_individual.keys() if key not in ['fitness', 'word_percent']]
                 # Swap two letter values
                 key1, key2 = random.sample(letter_keys, 2)
                 mutated_individual[key1], mutated_individual[key2] = mutated_individual[key2], mutated_individual[key1]
-            return mutated_individual
+
+        return mutated_individual
 
     def _evolution_step(self, parents):
         children = []
         for _ in range(len(parents)):
             parent1, parent2 = random.sample(parents, 2)
             child = crossover(parent1, parent2)
-            child = self._mutate(child)
+            child = self._mutate(child, 0)
             children.append(child)
         return children
 
@@ -196,13 +205,15 @@ class GeneticAlgorithm:
         self.add_children(children)
 
     def nuke_em(self):
+        # reduce 10 generations from self.generation
+        self.generations -= 10
         # Shuffle the population
         random.shuffle(self.population)
         # Kill double the selection amount
         self.population = self.population[:int(self.selection_rate * self.population_size * 0.5)]
         # Mutate the survivors
         for individual in self.population:
-            for _ in range(3):
+            for _ in range(5):
                 # Get letter keys
                 letter_keys = [key for key in individual.keys() if key != 'fitness' and key != 'word_percent']
                 # Swap two letter values
@@ -215,7 +226,7 @@ class GeneticAlgorithm:
         for i in range(self.population_size - len(self.population)):
             parent1, parent2 = random.sample(self.population, 2)
             child = crossover(parent1, parent2)
-            child = self._mutate(child)
+            child = self._mutate(child, 0)
             self._evaluate_fitness(child)
             children.append(child)
 
@@ -236,10 +247,10 @@ class GeneticAlgorithm:
             decrypted_word = ''.join(decrypted_word)
             if decrypted_word.lower() in COMMON_WORDS:
                 if len(decrypted_word) == 1:
-                    fitness += 100
+                    fitness += 500  # Reward one-letter words
                 else:
-                    fitness += len(decrypted_word)
-                    word_percent += 1
+                    fitness += len(decrypted_word) ** 2  # Reward exponentially based on word length
+                word_percent += 1
 
         individual['word_percent'] = word_percent / len(encryption_code.split())
 
@@ -254,30 +265,23 @@ class GeneticAlgorithm:
 
         return fitness
 
-    def check_local_optima(self):
-        """
-        Function is responsible for running the local optimum search for Part B of the exercise.
-        It performs a number (N) of mutations for each input permutation, and then, according to the type of the run,
-        updates the permutation and its fitness score.
-        """
+    def lamarckian_optimization(self):
         for i in range(len(self.population)):
             individual = self.population[i]
-            # Calculate fitness for each individual
-            individual['fitness'] = self._compute_fitness(individual)
-
             new_individual = copy.deepcopy(individual)
-            new_individual = self._mutate(new_individual)
+            new_individual = self._mutate(new_individual, 1)
             new_individual['fitness'] = self._compute_fitness(new_individual)
 
             if new_individual['fitness'] > individual['fitness']:
                 # Lamarckian
-                if self.run_type == "lamarckian":
+                if self.run_type == 1:
                     self.population[i] = new_individual
                 # Darwinian
-                elif self.run_type == "darwinian":
+                elif self.run_type == 2:
                     individual['fitness'] = new_individual['fitness']
 
     def run(self):
+        self.population = self._create_population()
         # calculate fitness for each individual
         for individual_dict in self.population:
             individual_dict['fitness'] = self._compute_fitness(individual_dict)
@@ -286,18 +290,18 @@ class GeneticAlgorithm:
         target_word_percentage = 1  # The fitness value to track progress towards
 
         initial_word_percentage = self.population[0]['word_percent']
-        generations = 0
         local_minima = 0
+        nuke_count = 0
         word_percentage = self.population[0]['word_percent']
         # create bar
         bar = tqdm(total=target_word_percentage, initial=initial_word_percentage, desc="Word Percentage", position=0,
                    leave=True)
 
-        while generations < 150 and local_minima <= 10 and self.population[0]['word_percent'] < target_word_percentage:
+        while self.generations < 300 and local_minima <= 10 and self.population[0]['word_percent'] < target_word_percentage:
             self.evolve()  # Evolve the population
 
-            if self.run_type == 0:
-                self.check_local_optima()
+            if self.run_type != 0:
+                self.lamarckian_optimization()
 
             bar.update(self.population[0]['word_percent'] - word_percentage)
             current_word_percentage = self.population[0]['word_percent']
@@ -311,13 +315,18 @@ class GeneticAlgorithm:
                 if self.population[0]['word_percent'] > 0.9:
                     break
                 else:
+                    if nuke_count > 5:
+                        # Re-run the whole program
+                        print("Nuked too many times, re-running program\n")
+                        return self.run()
                     self.nuke_em()
+                    nuke_count += 1
                     print("Nuked\n")
                     local_minima = 0
             bar.set_description(f"Word Percentage: {self.population[0]['word_percent']}")
-            generations += 1
+            self.generations += 1
         bar.close()
-        print(f"Generations: {generations}")
+        print(f"Generations: {self.generations}")
         print(f"Calls to fitness: {self.fitness_counter}")
         self.decrypt()
 
@@ -342,10 +351,22 @@ class GeneticAlgorithm:
 
 
 def main():
-    fitness_scores = []
-    N = 5
-    RUN_TYPE = 1
-    algorithm = GeneticAlgorithm(population_size=2000, selection_rate=0.3, mutation_rate=0.05, run_type=RUN_TYPE, N=N)
+    # ask for run type from user, if not 0,1,2 then ask again
+    run_type = -1
+    mutation_count = 0
+    while run_type not in [0, 1, 2]:
+        run_type = int(input("Enter run type (0: normal, 1: lamarckian, 2: darwinian): "))
+    if run_type == 0:
+        print("Normal Run")
+    elif run_type == 1:
+        print("Lamarckian Run")
+        mutation_count = int(input("Enter number of mutations(recommended 5): "))
+    elif run_type == 2:
+        print("Darwinian Run")
+        mutation_count = int(input("Enter number of mutations(recommended 5): "))
+
+    algorithm = GeneticAlgorithm(population_size=1000, selection_rate=0.8, mutation_rate=0.25, run_type=run_type,
+                                 mutation_count=mutation_count)
     algorithm.run()
 
 
