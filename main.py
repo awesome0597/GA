@@ -311,17 +311,17 @@ class GeneticAlgorithm:
                 local_minima = 0
             word_percentage = current_word_percentage
             if local_minima > 10:
-                print("Local minima reached: " + str(self.population[0]['word_percent']) + "\n")
+                print("\nLocal minima reached: " + str(self.population[0]['word_percent']))
                 if self.population[0]['word_percent'] > 0.9:
                     break
                 else:
                     if nuke_count > 5:
                         # Re-run the whole program
-                        print("Nuked too many times, re-running program\n")
+                        print("\nNuked too many times, re-running program")
                         return self.run()
                     self.nuke_em()
                     nuke_count += 1
-                    print("Nuked\n")
+                    print("\nNuked")
                     local_minima = 0
             bar.set_description(f"Word Percentage: {self.population[0]['word_percent']}")
             self.generations += 1
