@@ -365,10 +365,10 @@ def main():
         print("Darwinian Run")
         mutation_count = int(input("Enter number of mutations(recommended 5): "))
 
-    algorithm = GeneticAlgorithm(population_size=1000, selection_rate=0.8, mutation_rate=0.25, run_type=run_type,
+    algorithm = GeneticAlgorithm(population_size=2000, selection_rate=0.8, mutation_rate=0.25, run_type=run_type,
                                  mutation_count=mutation_count)
     algorithm.run()
 
 
 if __name__ == "__main__":
-    exit(main())
+    main()
