@@ -41,7 +41,7 @@ class GeneticAlgorithm:
                     input_size = layer[0]
                     output_size = layer[1]
                     activation = layer[2]
-                    self.weights.append(np.random.randn(input_size, output_size))
+                    self.weights.append(2 * np.random.random((input_size, output_size)) - 1)
                     self.activations.append(activation)
 
             def propagate(self, data):
@@ -51,6 +51,8 @@ class GeneticAlgorithm:
                     a = self.activations[i](z)
                     input_data = a
                 yhat = a
+                # print shape of
+                print(yhat.shape)
                 return yhat
 
         def __init__(self, model):
@@ -115,7 +117,7 @@ class GeneticAlgorithm:
                         shape = weight.shape
                         flattened = weight.flatten()
                         rand_index = random.randint(0, len(flattened) - 1)
-                        flattened[rand_index] = np.random.randn()
+                        flattened[rand_index] = 2 * random.random() - 1  # Generate random value between -1 and 1
                         new_weights.append(flattened.reshape(shape))
                     individual.neural_network.weights = new_weights
         return population
@@ -153,7 +155,7 @@ class GeneticAlgorithm:
             # Lamarckian evolution
             for individual in population:
                 new_individual = copy.deepcopy(individual)
-                new_individual = self.mutation([new_individual])[0]
+                new_individual = self.mutation([new_individual], lamarckian=True)[0]
                 calculate_fitness(new_individual, self.X, self.y)
                 if new_individual.fitness > individual.fitness:
                     individual.neural_network = new_individual.neural_network
