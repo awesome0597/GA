@@ -2,11 +2,19 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
-from multiprocessing import Process, Queue
+from tqdm import tqdm
 
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
+
+
+def sign(x):
+    return np.where(x >= 0, 1, 0)
+
+
+def leaky_relu(x):
+    return np.maximum(0.1 * x, x)
 
 
 def binary_cross_entropy(predictions, targets):
@@ -16,23 +24,35 @@ def binary_cross_entropy(predictions, targets):
     return loss
 
 
-def calculate_fitness(individual, X, y):
-    predictions = individual.neural_network.propagate(X)
-    individual.fitness = 1 - binary_cross_entropy(predictions, y)
-
-
-def calculate_fitness_parallel(individual, X, y):
-    calculate_fitness(individual, X, y)
-
-
 def calculate_accuracy(predictions, targets):
     predictions_binary = np.round(predictions)
     accuracy = np.mean(predictions_binary == targets)
     return accuracy
 
 
+def calculate_fitness(individual, X, y):
+    predictions = individual.neural_network.propagate(X)
+    rounded_predictions = np.round(predictions)  # Round predictions to 0 or 1
+    accuracy = np.mean(rounded_predictions == y)  # Calculate accuracy
+    individual.fitness = accuracy
+
+
 class GeneticAlgorithm:
     class Individual:
+        X = None  # Static class variable to hold X
+        y = None  # Static class variable to hold y
+
+        def __init__(self, model):
+            self.neural_network = self.NeuralNetwork(model)
+            self.fitness = 0
+
+        @staticmethod
+        def calculate_fitness(individual):
+            predictions = individual.neural_network.propagate(GeneticAlgorithm.Individual.X)
+            rounded_predictions = (predictions > 0.5).astype(int)
+            accuracy = np.mean(rounded_predictions == GeneticAlgorithm.Individual.y)
+            individual.fitness = round(float(accuracy), 4)
+
         class NeuralNetwork:
             def __init__(self, model):
                 self.weights = []
@@ -48,26 +68,76 @@ class GeneticAlgorithm:
                 input_data = data
                 for i in range(len(self.weights)):
                     z = np.dot(input_data, self.weights[i])
-                    a = self.activations[i](z)
+                    a = leaky_relu(z)
                     input_data = a
                 yhat = a
-                # print shape of
-                print(yhat.shape)
                 return yhat
 
-        def __init__(self, model):
-            self.neural_network = self.NeuralNetwork(model)
-            self.fitness = 0
-
     def __init__(self, X, y, population_size=100, generations=100, threshold=0.001, selection_rate=0.2,
-                 mutation_rate=0.01):
+                 mutation_rate=0.01, batch_size=1):
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
         self.population_size = population_size
         self.generations = generations
         self.threshold = threshold
-        self.X = X
-        self.y = y
+        GeneticAlgorithm.Individual.X = X  # Set X as a static variable in Individual
+        GeneticAlgorithm.Individual.y = y  # Set y as a static variable in Individual
+        self.batch_size = batch_size
+
+    def run(self, model):
+        Iteration = []
+        convergence_data = []
+        generations = 0
+
+        population = [self.Individual(model) for _ in range(self.population_size)]
+        for individual in population:
+            individual.calculate_fitness(individual)
+
+        with tqdm(total=self.generations) as pbar:
+            while generations < self.generations:
+                Iteration.append(generations)
+                fitness_scores = [individual.fitness for individual in population]
+                mean_fitness = np.mean(fitness_scores)
+                max_fitness = np.max(fitness_scores)
+                convergence_data.append([mean_fitness, max_fitness])
+                pbar.set_description(
+                    f'Generation: {generations} Mean Fitness: {mean_fitness:.4f} Max Fitness: {max_fitness:.4f}')
+
+                # Lamarckian evolution
+                for individual in population:
+                    new_individual = copy.deepcopy(individual)
+                    new_individual = self.mutation([new_individual], lamarckian=True)[0]
+                    new_individual.calculate_fitness(individual)
+                    if new_individual.fitness > individual.fitness:
+                        individual.neural_network = new_individual.neural_network
+                        individual.fitness = new_individual.fitness
+
+                population = self.selection(population)
+                population = self.crossover(population, model, self.population_size)
+                population = self.mutation(population)
+
+                for individual in population:
+                    individual.calculate_fitness(individual)
+
+                if any(individual.fitness > self.threshold for individual in population):
+                    print('Threshold met at generation', generations, '!')
+                    break
+
+                generations += 1
+                pbar.update(1)
+
+        best_individual = population[0]
+
+        # Plot convergence data
+        convergence_data = np.array(convergence_data)
+        plt.plot(Iteration, convergence_data[:, 0], label='Mean Fitness')
+        plt.plot(Iteration, convergence_data[:, 1], label='Max Fitness')
+        plt.xlabel('Generation')
+        plt.ylabel('Fitness')
+        plt.legend()
+        plt.show()
+
+        return best_individual
 
     def selection(self, population):
         sorted_population = sorted(population, key=lambda individual: individual.fitness, reverse=True)
@@ -122,71 +192,6 @@ class GeneticAlgorithm:
                     individual.neural_network.weights = new_weights
         return population
 
-    def run(self, model):
-        Iteration = []
-        convergence_data = []
-        generations = 0
-
-        population = [self.Individual(model) for _ in range(self.population_size)]
-        for individual_index, individual in enumerate(population):
-            calculate_fitness(individual, self.X, self.y)
-
-        while generations < self.generations:
-            Iteration.append(generations)
-            fitness_scores = [individual.fitness for individual in population]
-            mean_fitness = np.mean(fitness_scores)
-            max_fitness = np.max(fitness_scores)
-            convergence_data.append([mean_fitness, max_fitness])
-            print('Generation:', generations, 'Mean Fitness:', mean_fitness, 'Max Fitness:', max_fitness)
-
-            fitness_processes = []
-            for individual_index, individual in enumerate(population):
-                p = Process(target=calculate_fitness_parallel, args=(individual, self.X, self.y))
-                p.start()
-                fitness_processes.append(p)
-
-            for p in fitness_processes:
-                p.join()
-
-            population = self.selection(population)
-            population = self.crossover(population, model, self.population_size)
-            population = self.mutation(population)
-
-            # Lamarckian evolution
-            for individual in population:
-                new_individual = copy.deepcopy(individual)
-                new_individual = self.mutation([new_individual], lamarckian=True)[0]
-                calculate_fitness(new_individual, self.X, self.y)
-                if new_individual.fitness > individual.fitness:
-                    individual.neural_network = new_individual.neural_network
-                    individual.fitness = new_individual.fitness
-
-            if any(individual.fitness > self.threshold for individual in population):
-                print('Threshold met at generation', generations, '!')
-                break
-
-            generations += 1
-
-        best_individual = population[0]
-        weights = best_individual.neural_network.weights
-        fitness = best_individual.fitness
-        predictions = best_individual.neural_network.propagate(self.X)
-
-        print("Best Individual's Weights:", weights)
-        print("Best Individual's Fitness:", fitness)
-        print("Predictions for Input X:", predictions)
-
-        # Plot convergence data
-        convergence_data = np.array(convergence_data)
-        plt.plot(Iteration, convergence_data[:, 0], label='Mean Fitness')
-        plt.plot(Iteration, convergence_data[:, 1], label='Max Fitness')
-        plt.xlabel('Generation')
-        plt.ylabel('Fitness')
-        plt.legend()
-        plt.show()
-
-        return best_individual
-
 
 def load_data(file_path):
     with open(file_path, 'r') as file:
@@ -206,9 +211,11 @@ def main():
 
     network = [[16, 1, sigmoid]]  # 16 input features, 1 output neuron
 
-    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=100, generations=10, threshold=0.9,
-                          selection_rate=0.5, mutation_rate=0.1)
+    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=50, generations=10, threshold=0.9,
+                          selection_rate=0.5, mutation_rate=1)
+
     best_individual = ga.run(network)
+
     test_predictions = best_individual.neural_network.propagate(X_test)
     test_accuracy = calculate_accuracy(test_predictions, y_test)
     print("Test Set Predictions:", test_predictions)
