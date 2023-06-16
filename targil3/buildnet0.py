@@ -71,18 +71,21 @@ class GeneticAlgorithm:
                     input_size = layer[0]
                     output_size = layer[1]
                     activation = layer[2]
-                    layer_weights = 2 * np.random.random((input_size, output_size)) - 1
+                    # layer_weights = 2 * np.random.random((input_size, output_size)) - 1
+                    layer_weights = np.random.randn(input_size, output_size) * np.sqrt(1 / input_size)
                     self.weights.append(layer_weights)
                     self.activations.append(activation)
 
             def propagate(self, data):
                 input_data = data
+                z = None  # Initialize z
                 for i in range(len(self.weights)):
                     z = np.dot(input_data, self.weights[i])
                     if self.activations[i] != 0:
                         z = self.activations[i](z)
                     input_data = z
-                yhat = z
+                yhat = z.flatten()  # Flatten the output
+
                 return yhat
 
         def __init__(self, model):
@@ -90,9 +93,15 @@ class GeneticAlgorithm:
             self.fitness = 0
 
         def calculate_fitness(self):
+            # start_time = time.time()
             predictions = self.neural_network.propagate(GeneticAlgorithm.Individual.X)
+            # end_time = time.time()
+            # print('Time to propagate', end_time - start_time, 'seconds')
             rounded_predictions = (predictions > 0.5).astype(int)
+            # start_time = time.time()
             accuracy = compute_accuracy_score(GeneticAlgorithm.Individual.y, rounded_predictions)
+            # end_time = time.time()
+            # print('Time to calculate accuracy', end_time - start_time, 'seconds')
             self.fitness = round(float(accuracy), 4)
 
     def __init__(self, X, y, population_size=100, generations=100, threshold=0.001, selection_rate=0.2,
@@ -128,21 +137,23 @@ class GeneticAlgorithm:
                 pbar.set_description(
                     f'Generation: {generations} Mean Fitness: {convergence_data[-1][0]:.4f} Max Fitness: {convergence_data[-1][1]:.4f}')
 
-                for individual in population:
-                    new_individual = copy.deepcopy(individual)
-                    new_individual = self.mutation([new_individual], lamarckian=True)[0]
-                    new_individual.calculate_fitness()
-                    if new_individual.fitness > individual.fitness:
-                        individual.neural_network = new_individual.neural_network
-                        individual.fitness = new_individual.fitness
+                # for individual in population:
+                #     new_individual = copy.deepcopy(individual)
+                #     new_individual = self.mutation([new_individual], lamarckian=True)[0]
+                #     new_individual.calculate_fitness()
+                #     if new_individual.fitness > individual.fitness:
+                #         individual.neural_network = new_individual.neural_network
+                #         individual.fitness = new_individual.fitness
 
-                population = self.selection(population)
-                population = self.crossover(population, model, self.population_size)
-                population = self.mutation(population)
+                elite = self.selection(population)
+                children = self.crossover(elite, model, self.population_size)
+                mutated_children = self.mutation(children)
 
-                for individual in population:
+                for individual in mutated_children:
                     individual.calculate_fitness()
+                population.extend(mutated_children)
                 population = sorted(population, key=lambda x: x.fitness, reverse=True)
+                population = population[:self.population_size]
 
                 if any(individual.fitness > self.threshold for individual in population):
                     print('Threshold met at generation', generations, '!')
@@ -190,7 +201,7 @@ class GeneticAlgorithm:
 
     def crossover(self, population, network, pop_size):
         children = []
-        for _ in range((pop_size - len(population))):
+        for _ in range((len(population))):
             parent1, parent2 = random.sample(population, 2)
             child = self.Individual(network)
 
@@ -207,8 +218,7 @@ class GeneticAlgorithm:
             child.neural_network.weights = child_weights
             children.append(child)
 
-        population.extend(children)
-        return population
+        return children
 
     def mutation(self, population, lamarckian=False):
         mutation_count = 5
@@ -216,10 +226,11 @@ class GeneticAlgorithm:
             mutation_count = 10
 
         for individual in population:
-            for _ in range(mutation_count):
-                mask = np.random.choice([True, False], size=individual.neural_network.weights[0].shape,
-                                        p=[self.mutation_rate, 1 - self.mutation_rate])
-                individual.neural_network.weights[0][mask] += np.random.normal(0, 0.1, size=mask.sum())
+            for layer_weights in individual.neural_network.weights:
+                for _ in range(mutation_count):
+                    mask = np.random.choice([True, False], size=layer_weights.shape,
+                                            p=[self.mutation_rate, 1 - self.mutation_rate])
+                    layer_weights[mask] += np.random.normal(0, 0.1, size=mask.sum())
 
         return population
 
@@ -240,10 +251,10 @@ def main():
     X_train, y_train = load_data(learning_file)
     X_test, y_test = load_data(test_file)
 
-    network = [[16, 64, 0], [64, 32, 0], [32, 32, 0], [32, 1, sigmoid]]  # 16 input features, 1 output neuron
+    network = [[16, 32, 0], [32, 64, 0], [64, 32, 0], [32, 1, sigmoid]]  # 16 input features, 1 output neuron
 
-    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=250, generations=20, threshold=0.9,
-                          selection_rate=0.6, mutation_rate=0.4)
+    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=250, generations=50, threshold=0.9,
+                          selection_rate=0.2, mutation_rate=0.4)
 
     best_individual = ga.run(network)
     test_predictions = best_individual.neural_network.propagate(X_test)
