@@ -6,47 +6,17 @@ from tqdm import tqdm
 import time
 
 
-def compute_accuracy_score(y_train, predictions):
-    """
-        Calculates the accuracy score of the predictions made by the network.
-        If a prediction matches its true label, it increments the count of correct predictions.
-        The accuracy score is the correct predictions divided by the total predictions.
-    """
-    num_samples = len(y_train)
-    correct_predictions = 0
-
-    # If the prediction is correct, increment the count of correct predictions
-    for true_label, predicted_label in zip(y_train, predictions):
-        if true_label == predicted_label:
-            correct_predictions += 1
-
-    # Compute accuracy as the ratio of correct predictions to total number of samples
-    accuracy = correct_predictions / num_samples
-    return accuracy
-
-
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
-
-
-def sign(x):
-    return np.where(x >= 0, 1, 0)
 
 
 def leaky_relu(x):
     return np.maximum(0.1 * x, x)
 
 
-def binary_cross_entropy(predictions, targets):
-    epsilon = 1e-10
-    predictions = np.clip(predictions, epsilon, 1 - epsilon)  # Clip predictions to avoid numerical instability
-    loss = -(targets * np.log(predictions) + (1 - targets) * np.log(1 - predictions))
-    return loss
-
-
 def predict(predictions, targets):
     predictions_binary = np.round(predictions)
-    accuracy = compute_accuracy_score(targets, predictions_binary)
+    accuracy = np.mean(predictions_binary == targets)
     return accuracy
 
 
@@ -78,30 +48,21 @@ class GeneticAlgorithm:
 
             def propagate(self, data):
                 input_data = data
-                z = None  # Initialize z
-                for i in range(len(self.weights)):
-                    z = np.dot(input_data, self.weights[i])
+                z = None
+                for i, weights in enumerate(self.weights):
+                    z = np.dot(input_data, weights)
                     if self.activations[i] != 0:
                         z = self.activations[i](z)
                     input_data = z
-                yhat = z.flatten()  # Flatten the output
-
-                return yhat
+                return np.ravel(z)
 
         def __init__(self, model):
             self.neural_network = self.NeuralNetwork(model)
             self.fitness = 0
 
         def calculate_fitness(self):
-            # start_time = time.time()
             predictions = self.neural_network.propagate(GeneticAlgorithm.Individual.X)
-            # end_time = time.time()
-            # print('Time to propagate', end_time - start_time, 'seconds')
-            rounded_predictions = (predictions > 0.5).astype(int)
-            # start_time = time.time()
-            accuracy = compute_accuracy_score(GeneticAlgorithm.Individual.y, rounded_predictions)
-            # end_time = time.time()
-            # print('Time to calculate accuracy', end_time - start_time, 'seconds')
+            accuracy = np.mean((predictions > 0.5).astype(int) == GeneticAlgorithm.Individual.y)
             self.fitness = round(float(accuracy), 4)
 
     def __init__(self, X, y, population_size=100, generations=100, threshold=0.001, selection_rate=0.2,
@@ -135,7 +96,8 @@ class GeneticAlgorithm:
             while generations < self.generations:
                 update_convergence_data(population, generations, Iteration, convergence_data)
                 pbar.set_description(
-                    f'Generation: {generations} Mean Fitness: {convergence_data[-1][0]:.4f} Max Fitness: {convergence_data[-1][1]:.4f}')
+                    f'Generation: {generations} Mean Fitness: {convergence_data[-1][0]:.4f} Max Fitness: '
+                    f'{convergence_data[-1][1]:.4f}')
 
                 # for individual in population:
                 #     new_individual = copy.deepcopy(individual)
@@ -221,9 +183,9 @@ class GeneticAlgorithm:
         return children
 
     def mutation(self, population, lamarckian=False):
-        mutation_count = 5
+        mutation_count = 3
         if lamarckian:
-            mutation_count = 10
+            mutation_count = 5
 
         for individual in population:
             for layer_weights in individual.neural_network.weights:
@@ -251,10 +213,10 @@ def main():
     X_train, y_train = load_data(learning_file)
     X_test, y_test = load_data(test_file)
 
-    network = [[16, 32, 0], [32, 64, 0], [64, 32, 0], [32, 1, sigmoid]]  # 16 input features, 1 output neuron
+    network = [[16, 64, 0], [64, 32, 0], [32, 32, 0], [32, 1, leaky_relu]]  # 16 input features, 1 output neuron
 
-    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=250, generations=50, threshold=0.9,
-                          selection_rate=0.2, mutation_rate=0.4)
+    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=250, generations=20, threshold=0.9,
+                          selection_rate=0.4, mutation_rate=0.4)
 
     best_individual = ga.run(network)
     test_predictions = best_individual.neural_network.propagate(X_test)
