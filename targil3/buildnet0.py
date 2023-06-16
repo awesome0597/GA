@@ -117,6 +117,8 @@ class GeneticAlgorithm:
                 population = sorted(population, key=lambda x: x.fitness, reverse=True)
                 population = population[:self.population_size]
 
+                population = self.lamarckian_evolution(population)
+
                 if any(individual.fitness > self.threshold for individual in population):
                     print('Threshold met at generation', generations, '!')
                     break
@@ -124,7 +126,7 @@ class GeneticAlgorithm:
                 max_fitness = population[0].fitness
                 if max_fitness <= max_fitness_prev:
                     local_minima += 1
-                    if local_minima >= 10:
+                    if local_minima >= 100:
                         print('Local minima reached. Exiting...')
                         break
                 else:
@@ -183,20 +185,26 @@ class GeneticAlgorithm:
         return children
 
     def mutation(self, population, lamarckian=False):
-        mutation_count = 3
+        mutation_rate = self.mutation_rate
         if lamarckian:
-            mutation_count = 5
+            mutation_rate = 0.2
 
         for individual in population:
             for layer_weights in individual.neural_network.weights:
                 mask = np.random.choice([True, False], size=layer_weights.shape,
-                                        p=[self.mutation_rate, 1 - self.mutation_rate])
+                                        p=[mutation_rate, 1 - mutation_rate])
                 layer_weights[mask] = np.random.normal(0, 0.1, size=mask.sum())
-                # for _ in range(mutation_count):
-                #     mask = np.random.choice([True, False], size=layer_weights.shape,
-                #                             p=[self.mutation_rate, 1 - self.mutation_rate])
-                #     layer_weights[mask] += np.random.normal(0, 0.1, size=mask.sum())
 
+        return population
+
+    def lamarckian_evolution(self, population):
+        for i in range(len(population)):
+            individual = population[i]
+            new_individual = copy.deepcopy(individual)
+            new_individual = self.mutation([new_individual], lamarckian=True)[0]
+            new_individual.calculate_fitness()
+            if new_individual.fitness > individual.fitness:
+                population[i] = new_individual
         return population
 
 
@@ -216,10 +224,10 @@ def main():
     X_train, y_train = load_data(learning_file)
     X_test, y_test = load_data(test_file)
 
-    network = [[16, 64, 0], [64, 32, 0], [32, 32, 0], [32, 1, leaky_relu]]  # 16 input features, 1 output neuron
+    network = [[16, 16, 0], [16, 32, 0], [32, 32, 0], [32, 1, leaky_relu]]  # 16 input features, 1 output neuron
 
-    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=500, generations=50, threshold=0.9,
-                          selection_rate=0.4, mutation_rate=0.2)
+    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=250, generations=50, threshold=0.9,
+                          selection_rate=0.5, mutation_rate=0.01)
 
     best_individual = ga.run(network)
     test_predictions = best_individual.neural_network.propagate(X_test)
