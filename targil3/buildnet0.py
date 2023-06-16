@@ -189,10 +189,13 @@ class GeneticAlgorithm:
 
         for individual in population:
             for layer_weights in individual.neural_network.weights:
-                for _ in range(mutation_count):
-                    mask = np.random.choice([True, False], size=layer_weights.shape,
-                                            p=[self.mutation_rate, 1 - self.mutation_rate])
-                    layer_weights[mask] += np.random.normal(0, 0.1, size=mask.sum())
+                mask = np.random.choice([True, False], size=layer_weights.shape,
+                                        p=[self.mutation_rate, 1 - self.mutation_rate])
+                layer_weights[mask] = np.random.normal(0, 0.1, size=mask.sum())
+                # for _ in range(mutation_count):
+                #     mask = np.random.choice([True, False], size=layer_weights.shape,
+                #                             p=[self.mutation_rate, 1 - self.mutation_rate])
+                #     layer_weights[mask] += np.random.normal(0, 0.1, size=mask.sum())
 
         return population
 
@@ -215,8 +218,8 @@ def main():
 
     network = [[16, 64, 0], [64, 32, 0], [32, 32, 0], [32, 1, leaky_relu]]  # 16 input features, 1 output neuron
 
-    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=250, generations=20, threshold=0.9,
-                          selection_rate=0.4, mutation_rate=0.4)
+    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=500, generations=50, threshold=0.9,
+                          selection_rate=0.4, mutation_rate=0.2)
 
     best_individual = ga.run(network)
     test_predictions = best_individual.neural_network.propagate(X_test)
