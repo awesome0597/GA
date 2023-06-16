@@ -196,7 +196,7 @@ class GeneticAlgorithm:
     def mutation(self, population, lamarckian=False):
         mutation_rate = self.mutation_rate
         if lamarckian:
-            mutation_rate = 0.5
+            mutation_rate = 0.15
 
         for individual in population:
             for layer_weights in individual.neural_network.weights:
