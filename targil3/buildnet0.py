@@ -15,8 +15,7 @@ def leaky_relu(x):
 
 
 def predict(predictions, targets):
-    predictions_binary = np.round(predictions)
-    accuracy = np.mean(predictions_binary == targets)
+    accuracy = np.mean((predictions > 0.5).astype(int) == targets)
     return accuracy
 
 
@@ -82,11 +81,8 @@ class GeneticAlgorithm:
         generations = 0
         max_fitness_prev = -float('inf')  # Previous maximum fitness
         population = [self.Individual(model) for _ in range(self.population_size)]
-        start_time = time.time()
         for individual in population:
             individual.calculate_fitness()
-        end_time = time.time()
-        print('Time to calculate fitness for initial population:', end_time - start_time, 'seconds')
         population = sorted(population, key=lambda x: x.fitness, reverse=True)
         if population[0].fitness > max_fitness_prev:
             max_fitness_prev = population[0].fitness
@@ -126,7 +122,7 @@ class GeneticAlgorithm:
                 max_fitness = population[0].fitness
                 if max_fitness <= max_fitness_prev:
                     local_minima += 1
-                    if local_minima >= 100:
+                    if local_minima >= 10:
                         print('Local minima reached. Exiting...')
                         break
                 else:
@@ -224,16 +220,14 @@ def main():
     X_train, y_train = load_data(learning_file)
     X_test, y_test = load_data(test_file)
 
-    network = [[16, 16, 0], [16, 32, 0], [32, 32, 0], [32, 1, leaky_relu]]  # 16 input features, 1 output neuron
+    network = [[16, 1, leaky_relu]]  # 16 input features, 1 output neuron
 
-    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=250, generations=50, threshold=0.9,
+    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=250, generations=50, threshold=0.98,
                           selection_rate=0.5, mutation_rate=0.01)
 
     best_individual = ga.run(network)
     test_predictions = best_individual.neural_network.propagate(X_test)
-    test_accuracy = predict(test_predictions, y_test)
-    print("Test Set Predictions:", test_predictions)
-    print("Test Set Accuracy:", test_accuracy)
+    print("Test Set Accuracy:", predict(test_predictions, y_test))
 
 
 if __name__ == '__main__':
