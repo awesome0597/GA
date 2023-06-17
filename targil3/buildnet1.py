@@ -18,7 +18,7 @@ def sign(x):
 
 
 def predict(predictions, targets):
-    accuracy = np.mean((predictions > 0.5).astype(int) == targets)
+    accuracy = np.mean((predictions > 0).astype(int) == targets)
     return accuracy
 
 
@@ -39,23 +39,23 @@ class GeneticAlgorithm:
             def __init__(self, model):
                 self.weights = []
                 self.activations = []
+                self.biases = []
                 for layer in model:
                     input_size = layer[0]
                     output_size = layer[1]
                     activation = layer[2]
-                    # layer_weights = 2 * np.random.random((input_size, output_size)) - 1
-                    layer_weights = np.random.randn(input_size, output_size) * np.sqrt(1 / input_size)
+                    layer_weights = np.random.randn(input_size, output_size)
                     # layer_weights = np.random.uniform(-1, 1, size=(input_size, output_size))
-                    # scale = np.sqrt(2 / input_size)
-                    # layer_weights = np.random.randn(input_size, output_size) * scale
+                    layer_biases = np.random.randn(output_size)
                     self.weights.append(layer_weights)
+                    self.biases.append(layer_biases)
                     self.activations.append(activation)
 
             def propagate(self, data):
                 input_data = data
                 z = None
                 for i, weights in enumerate(self.weights):
-                    z = np.dot(input_data, weights)
+                    z = np.dot(input_data, weights) + self.biases[i]
                     if self.activations[i] != 0:
                         z = self.activations[i](z)
                     input_data = z
@@ -120,15 +120,9 @@ class GeneticAlgorithm:
                 max_fitness = population[0].fitness
                 if max_fitness <= max_fitness_prev:
                     local_minima += 1
-                    if local_minima >= 15:
-                        if f'{convergence_data[-1][0]:.4f}' == f'{convergence_data[-1][1]:.4f}':
-                            population = self.reset_population(population, model)
-                            population = self.lamarckian_evolution(population)
-                            local_minima = 0
-                            print("Resetting population...")
-                        else:
-                            print('Local minima reached. Exiting...')
-                            break
+                    if local_minima >= 50:
+                        print('Local minima reached. Exiting...')
+                        break
                 else:
                     local_minima = 0
                     max_fitness_prev = max_fitness
@@ -147,15 +141,6 @@ class GeneticAlgorithm:
         plt.show()
 
         return best_individual
-    def reset_population(self, population, model):
-        sorted_population = sorted(population, key=lambda individual: individual.fitness, reverse=True)
-        # create a new population half the size of self.population_size
-        # return a new population consisting of the first half of the sorted population and the new population
-        new_population = [self.Individual(model) for _ in range(self.population_size - 1)]
-        for individual in new_population:
-            individual.calculate_fitness()
-        new_population = sorted(new_population, key=lambda x: x.fitness, reverse=True)
-        return sorted_population[:1] + new_population
 
     def selection(self, population):
         sorted_population = sorted(population, key=lambda individual: individual.fitness, reverse=True)
@@ -234,11 +219,10 @@ def main():
     X_train, y_train = load_data(learning_file)
     X_test, y_test = load_data(test_file)
 
-    # if change sign remember to change calculate_fitness function
-    network = [[16, 1, sign]]  # 16 input features, 1 output neuron
+    network = [[16, 1, sign]]  # 16 input features, 1 output neuron, sign activation function
 
-    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=250, generations=300, threshold=0.99,
-                          selection_rate=0.6, mutation_rate=0.03)
+    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=150, generations=300, threshold=0.99,
+                          selection_rate=0.5, mutation_rate=0.015)
 
     best_individual = ga.run(network)
     test_predictions = best_individual.neural_network.propagate(X_test)
