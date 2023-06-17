@@ -3,9 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 from tqdm import tqdm
-import time
+import json
 
-PREDICTION_THRESHOLD = 0.8
+PREDICTION_THRESHOLD = 0
+LAMARCKIAN = 0.2
+LOCAL_MINIMA = 20
 
 
 def relu(x):
@@ -25,14 +27,7 @@ def leaky_relu(x):
 
 
 def predict(predictions, targets):
-    num_predictions = len(predictions)
     accuracy = np.mean((predictions > PREDICTION_THRESHOLD).astype(int) == targets)
-    bad = 0
-    for i in range(num_predictions):
-        if (predictions[i] > PREDICTION_THRESHOLD).astype(int) != targets[i]:
-            print(f"Mismatch at prediction {i + 1}, prediction: {predictions[i]}, target: {targets[i]}")
-            bad += 1
-    print(bad)
     return accuracy
 
 
@@ -72,7 +67,17 @@ class GeneticAlgorithm:
                     layer_biases = np.random.randn(output_size)  # New line
                     self.weights.append(layer_weights)
                     self.biases.append(layer_biases)  # New line
-                    self.activations.append(activation)
+                    # activation is a string, so we need to convert it to a function
+                    if activation == 'relu':
+                        self.activations.append(relu)
+                    elif activation == 'sign':
+                        self.activations.append(sign)
+                    elif activation == 'sigmoid':
+                        self.activations.append(sigmoid)
+                    elif activation == 'leaky_relu':
+                        self.activations.append(leaky_relu)
+                    else:
+                        raise Exception(f"Non-supported activation function: {activation}")
 
             def propagate(self, data):
                 input_data = data
@@ -93,8 +98,8 @@ class GeneticAlgorithm:
             accuracy = np.mean((predictions > PREDICTION_THRESHOLD).astype(int) == GeneticAlgorithm.Individual.y)
             self.fitness = round(float(accuracy), 4)
 
-    def __init__(self, X, y, population_size=100, generations=100, threshold=0.001, selection_rate=0.2,
-                 mutation_rate=0.01, batch_size=1):
+    def __init__(self, X, y, population_size=50, generations=300, threshold=0.97, selection_rate=0.5,
+                 mutation_rate=0.01):
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
         self.population_size = population_size
@@ -102,7 +107,6 @@ class GeneticAlgorithm:
         self.threshold = threshold
         GeneticAlgorithm.Individual.X = X  # Set X as a static variable in Individual
         GeneticAlgorithm.Individual.y = y  # Set y as a static variable in Individual
-        self.batch_size = batch_size
 
     def run(self, model):
         Iteration = []
@@ -133,7 +137,7 @@ class GeneticAlgorithm:
                         individual.fitness = new_individual.fitness
 
                 elite = self.selection(population)
-                children = self.crossover(elite, model, self.population_size)
+                children = self.crossover(elite, model)
                 mutated_children = self.mutation(children)
 
                 for individual in mutated_children:
@@ -144,16 +148,16 @@ class GeneticAlgorithm:
 
                 population = self.lamarckian_evolution(population)
 
-                if any(individual.fitness > self.threshold for individual in population):
-                    print('Threshold met at generation', generations, '!')
-                    break
-
                 max_fitness = population[0].fitness
                 if max_fitness <= max_fitness_prev:
                     local_minima += 1
-                    if local_minima >= 20:
-                        print('Local minima reached. Exiting...')
-                        break
+                    if local_minima >= LOCAL_MINIMA:
+                        if any(individual.fitness > self.threshold for individual in population):
+                            print('Threshold met at generation', generations, '!')
+                            break
+                        else:
+                            print('Local minima reached. Exiting...')
+                            break
                 else:
                     local_minima = 0
                     max_fitness_prev = max_fitness
@@ -162,14 +166,14 @@ class GeneticAlgorithm:
 
             best_individual = population[0]
 
-        # Plot convergence data
-        convergence_data = np.array(convergence_data)
-        plt.plot(Iteration, convergence_data[:, 0], label='Mean Fitness')
-        plt.plot(Iteration, convergence_data[:, 1], label='Max Fitness')
-        plt.xlabel('Generation')
-        plt.ylabel('Fitness')
-        plt.legend()
-        plt.show()
+        # # Plot convergence data
+        # convergence_data = np.array(convergence_data)
+        # plt.plot(Iteration, convergence_data[:, 0], label='Mean Fitness')
+        # plt.plot(Iteration, convergence_data[:, 1], label='Max Fitness')
+        # plt.xlabel('Generation')
+        # plt.ylabel('Fitness')
+        # plt.legend()
+        # plt.show()
 
         return best_individual
 
@@ -178,7 +182,7 @@ class GeneticAlgorithm:
         parents = sorted_population[:int(self.selection_rate * len(sorted_population))]
         return parents
 
-    def crossover(self, population, network, pop_size):
+    def crossover(self, population, network):
         children = []
         for _ in range((len(population))):
             parent1, parent2 = random.sample(population, 2)
@@ -215,7 +219,7 @@ class GeneticAlgorithm:
     def mutation(self, population, lamarckian=False):
         mutation_rate = self.mutation_rate
         if lamarckian:
-            mutation_rate = 0.2
+            mutation_rate = LAMARCKIAN
 
         for individual in population:
             for i in range(len(individual.neural_network.weights)):
@@ -254,21 +258,30 @@ def load_data(file_path):
     return np.array(features), np.array(labels)
 
 
+def save_data(best_individual, model):
+    data = {
+        'weights': [layer.tolist() for layer in best_individual.neural_network.weights],
+        'biases': [layer.tolist() for layer in best_individual.neural_network.biases],
+        'activations': [str(layer[2]) for layer in model]
+    }
+    with open("wnet0.txt", 'w') as file:
+        json.dump(data, file)
+
+
 def main():
     learning_file = "learning_file.txt"
     test_file = "test_file.txt"
-    new_test = "new_test.txt"
     X_train, y_train = load_data(learning_file)
-    X_test, y_test = load_data(new_test)
+    X_test, y_test = load_data(test_file)
 
-    network = [[16, 1, sign]]  # 16 input features, 1 output neuron
+    network = [[16, 1, "sign"]]
 
-    ga = GeneticAlgorithm(X=X_train, y=y_train, population_size=50, generations=300, threshold=1.0,
-                          selection_rate=0.5, mutation_rate=0.01)
+    ga = GeneticAlgorithm(X=X_train, y=y_train)
 
     best_individual = ga.run(network)
     test_predictions = best_individual.neural_network.propagate(X_test)
     print("Test Set Accuracy:", predict(test_predictions, y_test))
+    save_data(best_individual, network)
 
 
 if __name__ == '__main__':
