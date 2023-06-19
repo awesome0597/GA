@@ -5,9 +5,14 @@ import copy
 from tqdm import tqdm
 import json
 
+THRESHOLD = 0.98
 PREDICTION_THRESHOLD = 0
 LAMARCKIAN = 0.2
 LOCAL_MINIMA = 20
+POPULATION_SIZE = 250
+GENERATIONS = 300
+MUTATION_RATE = 0.1
+SELECTION_RATE = 0.5
 
 
 def relu(x):
@@ -26,8 +31,13 @@ def leaky_relu(x):
     return np.maximum(0.1 * x, x)
 
 
-def predict(predictions, targets):
+def predict(predictions, targets, z):
     accuracy = np.mean((predictions > PREDICTION_THRESHOLD).astype(int) == targets)
+    num_wrong = np.sum((predictions > PREDICTION_THRESHOLD).astype(int) != targets)
+    print("wrong predictions: ", num_wrong)
+    for i in range(len(predictions)):
+        if predictions[i] > PREDICTION_THRESHOLD and targets[i] == 0:
+            print(f"Predicted {z[i]} as 1")
     return accuracy
 
 
@@ -81,25 +91,26 @@ class GeneticAlgorithm:
 
             def propagate(self, data):
                 input_data = data
-                z = None
+                a = None
                 for i, weights in enumerate(self.weights):
                     z = np.dot(input_data, weights) + self.biases[i]  # Updated line
                     if self.activations[i] != 0:
-                        z = self.activations[i](z)
-                    input_data = z
-                return np.ravel(z)
+                        a = self.activations[i](z)
+                    input_data = a
+                return np.ravel(a), z
 
         def __init__(self, model):
             self.neural_network = self.NeuralNetwork(model)
             self.fitness = 0
+            self.exit_generation = 0
 
         def calculate_fitness(self):
-            predictions = self.neural_network.propagate(GeneticAlgorithm.Individual.X)
+            predictions, z = self.neural_network.propagate(GeneticAlgorithm.Individual.X)
             accuracy = np.mean((predictions > PREDICTION_THRESHOLD).astype(int) == GeneticAlgorithm.Individual.y)
             self.fitness = round(float(accuracy), 4)
 
-    def __init__(self, X, y, population_size=50, generations=300, threshold=0.97, selection_rate=0.5,
-                 mutation_rate=0.01):
+    def __init__(self, X, y, population_size=POPULATION_SIZE, generations=GENERATIONS, threshold=THRESHOLD,
+                 selection_rate=SELECTION_RATE, mutation_rate=MUTATION_RATE):
         self.selection_rate = selection_rate
         self.mutation_rate = mutation_rate
         self.population_size = population_size
@@ -128,14 +139,6 @@ class GeneticAlgorithm:
                     f'Generation: {generations} Mean Fitness: {convergence_data[-1][0]:.4f} Max Fitness: '
                     f'{convergence_data[-1][1]:.4f}')
 
-                for individual in population:
-                    new_individual = copy.deepcopy(individual)
-                    new_individual = self.mutation([new_individual], lamarckian=True)[0]
-                    new_individual.calculate_fitness()
-                    if new_individual.fitness > individual.fitness:
-                        individual.neural_network = new_individual.neural_network
-                        individual.fitness = new_individual.fitness
-
                 elite = self.selection(population)
                 children = self.crossover(elite, model)
                 mutated_children = self.mutation(children)
@@ -153,10 +156,12 @@ class GeneticAlgorithm:
                     local_minima += 1
                     if local_minima >= LOCAL_MINIMA:
                         if any(individual.fitness > self.threshold for individual in population):
-                            print('Threshold met at generation', generations, '!')
+                            # print('Threshold met at generation', generations, '!')
+                            population[0].exit_generation = generations
                             break
                         else:
                             print('Local minima reached. Exiting...')
+                            population[0].exit_generation = generations
                             break
                 else:
                     local_minima = 0
@@ -166,14 +171,14 @@ class GeneticAlgorithm:
 
             best_individual = population[0]
 
-        # # Plot convergence data
-        # convergence_data = np.array(convergence_data)
-        # plt.plot(Iteration, convergence_data[:, 0], label='Mean Fitness')
-        # plt.plot(Iteration, convergence_data[:, 1], label='Max Fitness')
-        # plt.xlabel('Generation')
-        # plt.ylabel('Fitness')
-        # plt.legend()
-        # plt.show()
+        # Plot convergence data
+        convergence_data = np.array(convergence_data)
+        plt.plot(Iteration, convergence_data[:, 0], label='Mean Fitness')
+        plt.plot(Iteration, convergence_data[:, 1], label='Max Fitness')
+        plt.xlabel('Generation')
+        plt.ylabel('Fitness')
+        plt.legend()
+        plt.show()
 
         return best_individual
 
@@ -271,18 +276,22 @@ def save_data(best_individual, model):
 def main():
     learning_file = "learning_file.txt"
     test_file = "test_file.txt"
+    testnet0 = "testnet0.txt"
     X_train, y_train = load_data(learning_file)
-    X_test, y_test = load_data(test_file)
+    X_test, y_test = load_data(testnet0)
 
     network = [[16, 1, "sign"]]
 
     ga = GeneticAlgorithm(X=X_train, y=y_train)
-
     best_individual = ga.run(network)
-    test_predictions = best_individual.neural_network.propagate(X_test)
-    print("Test Set Accuracy:", predict(test_predictions, y_test))
-    save_data(best_individual, network)
+    test_predictions, z = best_individual.neural_network.propagate(X_test)
+    print("WEIGHTS", best_individual.neural_network.weights)
+    print("BIASES", best_individual.neural_network.biases)
+    # print the sum of the weights
+    print("average weight: ", np.mean(best_individual.neural_network.weights))
+    print("sum of weights: ", np.sum(best_individual.neural_network.weights))
+    print("Test Set Accuracy:", predict(test_predictions, y_test, z))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
