@@ -263,6 +263,7 @@ class GeneticAlgorithm:
         """
         :param population: population of individuals
         """
+
         sorted_population = sorted(population, key=lambda individual: individual.fitness, reverse=True)
         parents = sorted_population[:int(self.selection_rate * len(sorted_population))]
         return parents
