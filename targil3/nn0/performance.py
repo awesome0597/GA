@@ -62,7 +62,7 @@ def calculate_averages(run_time, generations, train_accuracy, test_accuracy):
 
 
 # Example usage
-file_name = 'run_data250.csv'
+file_name = 'run_data150.csv'
 run_time, generations, train_accuracy, test_accuracy = read_csv(file_name)
 plot_comparison(run_time, generations, train_accuracy, test_accuracy, file_name)
 avg_run_time, avg_generations, avg_train_accuracy, avg_test_accuracy = calculate_averages(

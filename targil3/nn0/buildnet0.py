@@ -4,16 +4,31 @@ import matplotlib.pyplot as plt
 import copy
 from tqdm import tqdm
 import json
+import time
+import csv
 
 # Constants
 THRESHOLD = 0.98
-PREDICTION_THRESHOLD = 0
-LAMARCKIAN = 0.2
-LOCAL_MINIMA = 20
-POPULATION_SIZE = 250
+PREDICTION_THRESHOLD = 0.5
+LAMARCKIAN = 0.15
+LOCAL_MINIMA = 30
+POPULATION_SIZE = 150
 GENERATIONS = 300
-MUTATION_RATE = 0.1
+MUTATION_RATE = 0.015
 SELECTION_RATE = 0.5
+
+
+def gaussian(x, mu=10, sigma=1.5):
+    return np.exp(-((x - mu) ** 2) / (2 * sigma ** 2))
+
+
+def softmax(x):
+    """
+    :param x: array of predictions
+    :return: array of predictions after softmax activation
+    """
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum(axis=1, keepdims=True)
 
 
 def relu(x):
@@ -92,6 +107,7 @@ class GeneticAlgorithm:
     """
     Genetic algorithm class
     """
+
     class Individual:
         """
         Individual class
@@ -103,19 +119,24 @@ class GeneticAlgorithm:
             """
             Neural network class
             """
+
             def __init__(self, model):
                 """
                 :param model: given model
                 """
-                self.weights = [] # list of weights
-                self.biases = [] # list of biases
-                self.activations = [] # list of activations
-                for layer in model: # iterate over layers
+                self.weights = []  # list of weights
+                self.biases = []  # list of biases
+                self.activations = []  # list of activations
+                for layer in model:  # iterate over layers
                     input_size = layer[0]
                     output_size = layer[1]
                     activation = layer[2]
                     # initialize weights
-                    layer_weights = np.random.randn(input_size, output_size) * np.sqrt(1 / input_size)
+                    # layer_weights = np.random.randn(input_size, output_size) * np.sqrt(1 / input_size)
+                    # intialize weights to between 0 and 1 inclusive
+                    layer_weights = np.random.uniform(0, 1, (input_size, output_size))
+                    # initialize weights to 1
+                    # layer_weights = np.ones((input_size, output_size))
                     # initialize biases
                     layer_biases = np.random.randn(output_size)
                     # append weights and biases to lists
@@ -131,6 +152,10 @@ class GeneticAlgorithm:
                         self.activations.append(sigmoid)
                     elif activation == 'leaky_relu':
                         self.activations.append(leaky_relu)
+                    elif activation == 'softmax':
+                        self.activations.append(softmax)
+                    elif activation == 'gaussian':
+                        self.activations.append(gaussian)
                     else:
                         raise Exception(f"Non-supported activation function: {activation}")
 
@@ -160,7 +185,7 @@ class GeneticAlgorithm:
             """
             calculate fitness of individual
             """
-            predictions, z = self.neural_network.propagate(GeneticAlgorithm.Individual.X)
+            predictions = self.neural_network.propagate(GeneticAlgorithm.Individual.X)
             accuracy = np.mean((predictions > PREDICTION_THRESHOLD).astype(int) == GeneticAlgorithm.Individual.y)
             self.fitness = round(float(accuracy), 4)
 
@@ -196,6 +221,8 @@ class GeneticAlgorithm:
         population = [self.Individual(model) for _ in range(self.population_size)]
         for individual in population:
             individual.calculate_fitness()
+
+        # sort population by fitness
         population = sorted(population, key=lambda x: x.fitness, reverse=True)
         # calculate fitness of population
         if population[0].fitness > max_fitness_prev:
@@ -232,7 +259,7 @@ class GeneticAlgorithm:
                     if local_minima >= LOCAL_MINIMA:
                         # check if threshold is met
                         if any(individual.fitness > self.threshold for individual in population):
-                            print('Threshold met at generation', generations, '!')
+                            # print('Threshold met at generation', generations, '!')
                             population[0].exit_generation = generations
                             break
                         else:
@@ -248,7 +275,7 @@ class GeneticAlgorithm:
 
             best_individual = population[0]
 
-        # Plot the training progress
+        # Plot convergence data
         convergence_data = np.array(convergence_data)
         plt.plot(Iteration, convergence_data[:, 0], label='Mean Fitness')
         plt.plot(Iteration, convergence_data[:, 1], label='Max Fitness')
@@ -279,31 +306,31 @@ class GeneticAlgorithm:
             parent1, parent2 = random.sample(population, 2)
             child = self.Individual(network)
 
-            child_weights = [] # child weights
-            child_biases = [] # child biases
+            child_weights = []  # child weights
+            child_biases = []  # child biases
             for weights1, weights2, biases1, biases2 in zip(parent1.neural_network.weights,
                                                             parent2.neural_network.weights,
                                                             parent1.neural_network.biases,
-                                                            parent2.neural_network.biases): # iterate over parents
-                genes1 = weights1.flatten() # flatten weights
+                                                            parent2.neural_network.biases):  # iterate over parents
+                genes1 = weights1.flatten()  # flatten weights
                 genes2 = weights2.flatten()
 
-                split = random.randint(0, len(genes1) - 1) # random split
-                child_genes = np.concatenate((genes1[:split], genes2[split:])) # concatenate genes
+                split = random.randint(0, len(genes1) - 1)  # random split
+                child_genes = np.concatenate((genes1[:split], genes2[split:]))  # concatenate genes
 
-                child_weights.append(child_genes.reshape(weights1.shape)) # reshape genes
+                child_weights.append(child_genes.reshape(weights1.shape))  # reshape genes
 
-                bias_genes1 = biases1.flatten() # flatten biases
-                bias_genes2 = biases2.flatten() # flatten biases
+                bias_genes1 = biases1.flatten()  # flatten biases
+                bias_genes2 = biases2.flatten()  # flatten biases
 
-                split = random.randint(0, len(bias_genes1) - 1) # random split
-                child_bias_genes = np.concatenate((bias_genes1[:split], bias_genes2[split:])) # concatenate genes
+                split = random.randint(0, len(bias_genes1) - 1)  # random split
+                child_bias_genes = np.concatenate((bias_genes1[:split], bias_genes2[split:]))  # concatenate genes
 
-                child_biases.append(child_bias_genes.reshape(biases1.shape)) # reshape genes
+                child_biases.append(child_bias_genes.reshape(biases1.shape))  # reshape genes
 
-            child.neural_network.weights = child_weights # set child weights
-            child.neural_network.biases = child_biases # set child biases
-            children.append(child) # append child to children
+            child.neural_network.weights = child_weights  # set child weights
+            child.neural_network.biases = child_biases  # set child biases
+            children.append(child)  # append child to children
 
         return children
 
@@ -314,7 +341,7 @@ class GeneticAlgorithm:
         :param lamarckian: lamarckian evolution
         :return: mutated population
         """
-        mutation_rate = self.mutation_rate # mutation rate
+        mutation_rate = self.mutation_rate  # mutation rate
         if lamarckian:
             mutation_rate = LAMARCKIAN
 
@@ -325,13 +352,13 @@ class GeneticAlgorithm:
 
                 # Mutate the weights
                 weight_mask = np.random.choice([True, False], size=layer_weights.shape,
-                                               p=[mutation_rate, 1 - mutation_rate]) # random mask
-                layer_weights[weight_mask] = np.random.normal(0, 0.1, size=weight_mask.sum()) # set weights
+                                               p=[mutation_rate, 1 - mutation_rate])  # random mask
+                layer_weights[weight_mask] = np.random.normal(0, 1, size=weight_mask.sum())  # set weights
 
                 # Mutate the biases
                 bias_mask = np.random.choice([True, False], size=layer_biases.shape,
-                                             p=[mutation_rate, 1 - mutation_rate]) # random mask
-                layer_biases[bias_mask] = np.random.normal(0, 0.1, size=bias_mask.sum()) # set biases
+                                             p=[mutation_rate, 1 - mutation_rate])  # random mask
+                layer_biases[bias_mask] = np.random.normal(0, 1, size=bias_mask.sum())  # set biases
 
         return population
 
@@ -341,12 +368,12 @@ class GeneticAlgorithm:
         :return: population of individuals
         """
         for i in range(len(population)):
-            individual = population[i] # individual
-            new_individual = copy.deepcopy(individual) # copy individual
-            new_individual = self.mutation([new_individual], lamarckian=True)[0] # mutate individual
-            new_individual.calculate_fitness() # calculate fitness
-            if new_individual.fitness > individual.fitness: # if fitness is better
-                population[i] = new_individual # set individual to new individual
+            individual = population[i]  # individual
+            new_individual = copy.deepcopy(individual)  # copy individual
+            new_individual = self.mutation([new_individual], lamarckian=True)[0]  # mutate individual
+            new_individual.calculate_fitness()  # calculate fitness
+            if new_individual.fitness > individual.fitness:  # if fitness is better
+                population[i] = new_individual  # set individual to new individual
         return population
 
 
@@ -376,18 +403,13 @@ def main():
     X_train, y_train = load_data(learning_file)
     X_test, y_test = load_data(test_file)
 
-    network = [[16, 1, "sign"]]
-
+    network = [[16, 1, "gaussian"]]
     ga = GeneticAlgorithm(X=X_train, y=y_train)
     best_individual = ga.run(network)
-    test_predictions = best_individual.neural_network.propagate(X_test)
-    print("WEIGHTS", best_individual.neural_network.weights)
-    print("BIASES", best_individual.neural_network.biases)
-    # print the sum of the weights
-    print("average weight: ", np.mean(best_individual.neural_network.weights))
-    print("sum of weights: ", np.sum(best_individual.neural_network.weights))
-    print("Test Set Accuracy:", predict(test_predictions, y_test))
+    predictions = best_individual.neural_network.propagate(X_test)
+    print("Test Accuracy: ", predict(predictions, y_test))
 
 
 if __name__ == "__main__":
     main()
+

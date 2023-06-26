@@ -1,20 +1,51 @@
 import json
 import numpy as np
 
+PREDICTION_THRESHOLD = 0.5
+
+
+def gaussian(x, mu=10, sigma=1.5):
+    return np.exp(-((x - mu) ** 2) / (2 * sigma ** 2))
+
+
+def softmax(x):
+    """
+    :param x: array of predictions
+    :return: array of predictions after softmax activation
+    """
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum(axis=1, keepdims=True)
+
 
 def relu(x):
+    """
+    :param x: array of predictions
+    :return: array of predictions after relu activation
+    """
     return np.maximum(0, x)
 
 
 def sign(x):
+    """
+    :param x: array of predictions
+    :return: array of predictions after sign activation
+    """
     return np.sign(x)
 
 
 def sigmoid(x):
+    """
+    :param x: array of predictions
+    :return: array of predictions after sigmoid activation
+    """
     return 1 / (1 + np.exp(-x))
 
 
 def leaky_relu(x):
+    """
+    :param x: array of predictions
+    :return: array of predictions after leaky relu activation
+    """
     return np.maximum(0.1 * x, x)
 
 
@@ -34,6 +65,10 @@ class NeuralNetwork:
                 self.activations.append(sign)
             elif model[i][2] == 'leaky_relu':
                 self.activations.append(leaky_relu)
+            elif model[i][2] == 'softmax':
+                self.activations.append(softmax)
+            elif model[i][2] == 'gaussian':
+                self.activations.append(gaussian)
             else:
                 raise Exception(f"Unknown activation function {model[i][2]}")
 
@@ -72,11 +107,8 @@ def runnet(network, output_file, X_test):
     predictions = []
     for x in X_test:
         z = network.propagate(x)
-        #append the prediction to the list, if the prediction is negative, append 0, else append 1
-        if z < 0:
-            predictions.append(0)
-        else:
-            predictions.append(int(z))
+        # predict using the threshold
+        predictions.append(1 if z > PREDICTION_THRESHOLD else 0)
 
     # Write the predictions to the output file
     with open(output_file, "w") as file:
