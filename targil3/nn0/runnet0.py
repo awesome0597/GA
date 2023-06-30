@@ -130,7 +130,7 @@ def main():
     X_test = load_test(testnet0)
     # Run the test data through the network and save predictions to output file
     runnet(network, output_file, X_test)
-    print("Predictions saved to output.txt")
+    print("Predictions saved to predictions0.txt")
 
 
 if __name__ == '__main__':

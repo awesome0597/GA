@@ -89,9 +89,7 @@ def runnet(network, output_file, X_test):
 # Main function
 def main():
     #recieve argument entered through the command line
-    testnet = sys.argv[1]
-    #recieve the name of the file from the user
-    unlabeled_data_file = input("Enter the name of the unlabeled data file: ")
+    testnet = "testnet1.txt"
 
     saved_data_file = "wnet1.txt"
     output_file = "predictions1.txt"
@@ -101,7 +99,7 @@ def main():
 
     # create the network
     network = NeuralNetwork(model, weights, biases)
-    X_test = load_test(unlabeled_data_file)
+    X_test = load_test(testnet)
     # Run the test data through the network and save predictions to output file
     runnet(network, output_file, X_test)
     print("Predictions saved to predictions1.txt")

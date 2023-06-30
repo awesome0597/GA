@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 import copy
 from tqdm import tqdm
 import json
-import time
-import csv
 
 # Constants
 THRESHOLD = 0.98
@@ -279,10 +277,11 @@ class GeneticAlgorithm:
         convergence_data = np.array(convergence_data)
         plt.plot(Iteration, convergence_data[:, 0], label='Mean Fitness')
         plt.plot(Iteration, convergence_data[:, 1], label='Max Fitness')
+        plt.title('Convergence nn0')
         plt.xlabel('Generation')
         plt.ylabel('Fitness')
         plt.legend()
-        plt.show()
+        plt.savefig('convergence nn0.png')
 
         return best_individual
 
@@ -380,7 +379,7 @@ class GeneticAlgorithm:
 def load_data(file_path):
     with open(file_path, 'r') as file:
         lines = file.readlines()
-        data = [list(map(int, line.strip())) for line in lines]
+        data = [list(map(int, line.strip().replace(" ",""))) for line in lines]
     features = [sample[:-1] for sample in data]
     labels = [sample[-1] for sample in data]
     return np.array(features), np.array(labels)
@@ -397,8 +396,8 @@ def save_data(best_individual, model):
 
 
 def main():
-    learning_file = "learning_file.txt"
-    test_file = "test_file.txt"
+    learning_file = "train_file0.txt"
+    test_file = "test_file0.txt"
     testnet0 = "testnet0.txt"
     X_train, y_train = load_data(learning_file)
     X_test, y_test = load_data(test_file)
@@ -407,6 +406,7 @@ def main():
     ga = GeneticAlgorithm(X=X_train, y=y_train)
     best_individual = ga.run(network)
     predictions = best_individual.neural_network.propagate(X_test)
+    save_data(best_individual, network)
     print("Test Accuracy: ", predict(predictions, y_test))
 
 
